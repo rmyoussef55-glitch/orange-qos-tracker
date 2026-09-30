@@ -1,0 +1,15 @@
+{
+  "name": "Orange QoS Measurements Tracker",
+  "short_name": "QoS Tracker",
+  "description": "Orange Egypt QoS measurements, analysis and merged plan tracker",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#FF7900",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

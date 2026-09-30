@@ -1,0 +1,2846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Orange Plans Tracker</title>
+<meta name="theme-color" content="#FF7900">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="QoS Tracker">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#ffffff;
+    --panel:#ffffff;
+    --panel-alt:#f6f6f6;
+    --border:#e2e2e2;
+    --border-soft:#ececec;
+    --text:#151515;
+    --muted:#6e6e6e;
+    --accent:#FF7900;
+    --accent-dim:#e06c00;
+    --amber:#f5a623;
+    --blue:#3b7dd8;
+    --purple:#8b5cf6;
+    --green:#1e9e56;
+    --red:#d6334a;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 600px at 100% -10%, rgba(255,121,0,0.05), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    padding-bottom:80px;
+  }
+
+  /* ---------- Header ---------- */
+  header{
+    padding:36px 5vw 24px;
+    border-bottom:1px solid var(--border);
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    gap:16px;
+  }
+  .brand-eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    letter-spacing:0.18em;
+    text-transform:uppercase;
+    color:var(--accent);
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:10px;
+  }
+  .brand-eyebrow .dot{
+    width:6px;height:6px;border-radius:50%;
+    background:var(--accent);
+    box-shadow:0 0 8px var(--accent);
+    animation:pulse 2.2s ease-in-out infinite;
+  }
+  @keyframes pulse{
+    0%,100%{opacity:1;}
+    50%{opacity:.35;}
+  }
+  h1{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:clamp(26px,3.4vw,38px);
+    margin:0;
+    font-weight:700;
+    letter-spacing:-0.01em;
+  }
+  .brand-title{color:var(--accent);}
+  .header-right{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:14px;
+  }
+  .brand-logo{
+    height:60px;
+    width:auto;
+    border-radius:6px;
+    display:block;
+  }
+  header p{
+    margin:8px 0 0;
+    color:var(--muted);
+    font-size:14px;
+    max-width:520px;
+  }
+  .header-actions{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+
+  /* ---------- Buttons ---------- */
+  button{
+    font-family:'Inter',sans-serif;
+    cursor:pointer;
+    border-radius:7px;
+    border:1px solid var(--border);
+    background:var(--panel-alt);
+    color:var(--text);
+    padding:9px 14px;
+    font-size:13px;
+    font-weight:500;
+    transition:border-color .15s, background .15s, transform .1s;
+  }
+  button:hover{border-color:var(--accent-dim); background:#f2f2f2;}
+  button:active{transform:translateY(1px);}
+  button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:#ffffff;
+    font-weight:600;
+  }
+  button.primary:hover{background:var(--accent-dim);}
+  button.secondary{
+    background:transparent;
+    border-color:var(--border);
+    color:var(--text);
+  }
+  button.ghost{background:transparent;}
+  button.danger-text{color:var(--red); background:transparent; border-color:transparent; padding:4px 6px; font-size:12px;}
+  button.danger-text:hover{background:rgba(229,86,107,0.1); border-color:rgba(229,86,107,0.3);}
+  button.icon-btn{padding:6px 9px; font-size:14px; line-height:1;}
+
+  /* ---------- Drive sync bar ---------- */
+  .drive-bar{
+    display:none;
+    padding:16px 5vw;
+    background:var(--panel);
+    border-bottom:1px solid var(--border);
+  }
+  .drive-bar.open{display:block;}
+  .drive-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  .drive-status{display:flex; align-items:center; gap:8px; font-size:13.5px;}
+  .dot-status{width:8px; height:8px; border-radius:50%; background:var(--muted); flex:none;}
+  .dot-status.connected{background:var(--green); box-shadow:0 0 8px var(--green);}
+  .drive-controls{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .drive-controls input[type="text"]{width:280px; max-width:60vw;}
+  .sync-time{font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--muted);}
+  .drive-help{margin:10px 0 0; font-size:12.5px; color:var(--muted);}
+  .drive-help code{background:var(--panel-alt); padding:1px 5px; border-radius:4px; font-family:'IBM Plex Mono',monospace;}
+  details.drive-guide{margin-top:10px; font-size:12.5px; color:var(--muted);}
+  details.drive-guide summary{cursor:pointer; color:var(--accent); font-weight:500;}
+  details.drive-guide ol{margin:10px 0 0; padding-left:18px; line-height:1.7;}
+  details.drive-guide code{background:var(--panel-alt); padding:1px 5px; border-radius:4px; font-family:'IBM Plex Mono',monospace; color:var(--text);}
+  details.drive-guide a{color:var(--accent);}
+
+  /* ---------- Tabs ---------- */
+  nav.tabs{
+    display:flex;
+    gap:10px;
+    padding:20px 5vw 20px;
+    border-bottom:1px solid var(--border);
+    flex-wrap:wrap;
+  }
+  nav.tabs button{
+    background:var(--accent);
+    border:none;
+    border-radius:7px;
+    color:#ffffff;
+    padding:10px 18px;
+    margin-right:0;
+    font-size:14px;
+    font-weight:700;
+    border-bottom:none;
+    font-family:'Space Grotesk',sans-serif;
+    letter-spacing:0.01em;
+    transition:background .15s, box-shadow .15s;
+  }
+  nav.tabs button:hover{background:var(--accent-dim);}
+  nav.tabs button.active{
+    background:#151515;
+    color:#ffffff;
+    box-shadow:0 0 0 2px var(--accent);
+  }
+  nav.tabs button .count{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:rgba(255,255,255,0.85);
+    margin-left:6px;
+  }
+
+  main{padding:28px 5vw;}
+  section.panel{display:none;}
+  section.panel.active{display:block;}
+
+  .panel-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:16px;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+  .panel-head h2{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:18px;
+    margin:0;
+    font-weight:600;
+  }
+  .panel-head .sub{
+    color:var(--muted);
+    font-size:12.5px;
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .panel-head .head-btns{display:flex; gap:8px; flex-wrap:wrap;}
+
+  .period-bar{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-bottom:14px;
+  }
+  .period-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+  select.pill-select{
+    appearance:none; -webkit-appearance:none;
+    width:auto;
+    background:var(--accent);
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%23ffffff'/></svg>");
+    background-repeat:no-repeat;
+    background-position:right 12px center;
+    border:none;
+    border-radius:999px;
+    color:#ffffff;
+    font-weight:700;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:13.5px;
+    padding:9px 30px 9px 16px;
+  }
+  select.pill-select:hover{background-color:var(--accent-dim);}
+  select.pill-select:focus{box-shadow:0 0 0 2px rgba(255,121,0,0.3);}
+  .period-count{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--muted);
+  }
+
+  /* ---------- Table ---------- */
+  .search-bar{
+    display:flex;
+    align-items:flex-end;
+    gap:16px;
+    flex-wrap:wrap;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:16px 18px;
+    margin-bottom:18px;
+  }
+  .search-field{display:flex; flex-direction:column; gap:6px; min-width:150px;}
+  .search-field.grow{flex:1; min-width:200px;}
+  .search-field label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+
+  .table-wrap{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    overflow-x:auto;
+    overflow-y:auto;
+    max-height:70vh;
+  }
+  table{
+    width:100%;
+    border-collapse:collapse;
+    min-width:900px;
+  }
+  thead th{
+    text-align:left;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    color:#ffffff;
+    font-weight:500;
+    padding:12px 14px;
+    border-bottom:1px solid var(--border);
+    background:#000000;
+    white-space:nowrap;
+    position:sticky;
+    top:0;
+  }
+  tbody td{
+    padding:8px 10px;
+    border-bottom:1px solid var(--border-soft);
+    vertical-align:middle;
+  }
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:rgba(0,0,0,0.025);}
+  tbody tr.row-empty td{opacity:0.55;}
+
+  input[type="text"], input[type="date"], select, textarea{
+    width:100%;
+    background:#ffffff;
+    border:1px solid var(--border);
+    color:#000000;
+    border-radius:6px;
+    padding:7px 8px;
+    font-size:13px;
+    font-family:'Inter',sans-serif;
+    transition:border-color .15s, background .15s;
+  }
+  input::placeholder, textarea::placeholder{color:#8a8a8a;}
+  input[type="date"]{font-family:'IBM Plex Mono',monospace; font-size:12.5px;}
+  input:hover, select:hover, textarea:hover{
+    border-color:var(--accent);
+    background:rgba(255,121,0,0.06);
+  }
+  input:focus, select:focus, textarea:focus{
+    outline:none;
+    border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(255,121,0,0.14);
+  }
+  textarea{resize:vertical; min-height:34px; font-size:13px;}
+  select{appearance:none; -webkit-appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%23000000'/></svg>");
+    background-repeat:no-repeat;
+    background-position:right 8px center;
+    padding-right:22px;
+  }
+  .col-zone{min-width:150px;}
+  .col-comments{min-width:180px;}
+  .col-date{min-width:168px;}
+  .col-name{min-width:150px;}
+  .col-status{min-width:165px;}
+  .col-tech{min-width:150px;}
+  .col-attach{min-width:180px;}
+  .col-del{width:36px; text-align:center;}
+
+  /* status + signal bars (signature element) */
+  .status-cell{display:flex; align-items:center; gap:8px;}
+  .signal{display:flex; align-items:flex-end; gap:2px; height:14px;}
+  .signal i{width:3px; display:block; border-radius:1px; background:var(--border);}
+  .signal i:nth-child(1){height:5px;}
+  .signal i:nth-child(2){height:9px;}
+  .signal i:nth-child(3){height:14px;}
+  .status-notassigned .signal i:nth-child(1){background:var(--muted);}
+  .status-assigned .signal i:nth-child(1){background:var(--blue);}
+  .status-inprogress .signal i:nth-child(1),
+  .status-inprogress .signal i:nth-child(2){background:var(--amber);}
+  .status-delayed .signal i{background:var(--red);}
+  .status-done .signal i{background:var(--green);}
+  .status-badge{
+    display:inline-flex;
+    align-items:center;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;
+    padding:3px 9px;
+    border-radius:20px;
+    white-space:nowrap;
+  }
+  .status-badge.status-notassigned{background:rgba(110,110,110,0.14); color:var(--muted);}
+  .status-badge.status-assigned{background:rgba(59,125,216,0.15); color:var(--blue);}
+  .status-badge.status-inprogress{background:rgba(245,166,35,0.18); color:#8a5a00;}
+  .status-badge.status-delayed{background:rgba(214,51,74,0.15); color:var(--red);}
+  .status-badge.status-done{background:rgba(30,158,86,0.15); color:var(--green);}
+
+  .date-field{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    position:relative;
+  }
+  .date-field .date-text{
+    flex:1;
+    min-width:0;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12.5px;
+  }
+  .date-pick-btn{
+    flex:none;
+    padding:5px 7px;
+    font-size:12px;
+    line-height:1;
+  }
+  .date-hidden-picker{
+    position:absolute;
+    width:0; height:0;
+    opacity:0;
+    border:none; padding:0; margin:0;
+    pointer-events:none;
+  }
+
+  .zone-field{
+    font-family:'Aptos Narrow','Bahnschrift Condensed','Arial Narrow',sans-serif;
+    font-weight:700;
+  }
+
+  tr.row-done{background:#eaf7ec;}
+  tr.row-done input[type="text"],
+  tr.row-done input[type="date"],
+  tr.row-done select,
+  tr.row-done textarea,
+  tr.row-done .locked-field{
+    background:#d9f0dc;
+  }
+  tr.row-done input:hover, tr.row-done select:hover, tr.row-done textarea:hover, tr.row-done .locked-field:hover{
+    background:rgba(255,121,0,0.1);
+  }
+
+
+  /* Merged Plan — measurement-day rules */
+  @keyframes measFlash{
+    0%,100%{background:#d99a00;}
+    50%{background:#fdf6e3;}
+  }
+  tr.row-flash td{animation:measFlash 1.2s ease-in-out infinite;}
+  tr.row-flash .locked-field{background:transparent;}
+  tr.row-flash td{font-weight:600;}
+
+  tr.row-inprogress{background:#fdf6e3;}
+  tr.row-inprogress input[type="text"],
+  tr.row-inprogress input[type="date"],
+  tr.row-inprogress select,
+  tr.row-inprogress textarea,
+  tr.row-inprogress .locked-field{
+    background:#faecc0;
+  }
+  tr.row-inprogress input:hover, tr.row-inprogress select:hover, tr.row-inprogress textarea:hover, tr.row-inprogress .locked-field:hover{
+    background:rgba(255,121,0,0.1);
+  }
+
+  tr.row-delayed{background:#fbebee;}
+  tr.row-delayed input[type="text"],
+  tr.row-delayed input[type="date"],
+  tr.row-delayed select,
+  tr.row-delayed textarea,
+  tr.row-delayed .locked-field{
+    background:#f6d3d9;
+  }
+  tr.row-delayed input:hover, tr.row-delayed select:hover, tr.row-delayed textarea:hover, tr.row-delayed .locked-field:hover{
+    background:rgba(255,121,0,0.1);
+  }
+
+  .locked-field{
+    width:100%;
+    background:#ffffff;
+    border:1px solid transparent;
+    color:#000000;
+    padding:7px 8px;
+    font-size:13px;
+    border-radius:6px;
+    transition:background .15s;
+  }
+  .locked-field:hover{background:rgba(255,121,0,0.08);}
+  .source-badge{
+
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;
+    padding:3px 8px;
+    border-radius:20px;
+    white-space:nowrap;
+  }
+  .source-linked{background:rgba(255,121,0,0.12); color:var(--accent-dim);}
+  .source-manual{background:rgba(138,151,166,0.12); color:var(--muted);}
+
+  .attach-btn{
+    display:flex; align-items:center; gap:6px;
+    background:var(--panel-alt);
+    border:1px dashed var(--border);
+    color:var(--muted);
+    padding:7px 10px;
+    font-size:12.5px;
+    width:100%;
+    justify-content:center;
+  }
+  .attach-btn:hover{color:var(--accent); border-color:var(--accent-dim);}
+  .attach-chip{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    background:var(--panel-alt);
+    border:1px solid var(--border-soft);
+    border-radius:6px;
+    padding:6px 8px;
+    font-size:12px;
+  }
+  .attach-chip a{
+    color:var(--text);
+    text-decoration:none;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    max-width:120px;
+    flex:1;
+  }
+  .attach-chip a:hover{color:var(--accent);}
+  .attach-chip button{
+    padding:2px 6px;
+    font-size:11px;
+    border:none;
+    background:transparent;
+    color:var(--red);
+  }
+
+  .charts-row{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
+    gap:16px;
+    margin-bottom:20px;
+  }
+  .chart-card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:16px 16px 14px;
+  }
+  .chart-card h3{
+    margin:0 0 2px;
+    font-family:'Space Grotesk',sans-serif;
+    font-size:14.5px;
+    font-weight:700;
+  }
+  .chart-card .chart-sub{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10.5px;
+    color:var(--muted);
+    margin-bottom:12px;
+  }
+  .chart-section-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:0.05em;
+    margin:10px 0 6px;
+  }
+  .chart-bars{
+    display:flex;
+    align-items:flex-end;
+    gap:6px;
+    height:110px;
+    padding-top:20px;
+  }
+  .chart-bar-group{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    flex:1;
+    height:100%;
+    justify-content:flex-end;
+    min-width:0;
+  }
+  .chart-bar{
+    width:100%;
+    max-width:30px;
+    border-radius:4px 4px 0 0;
+    position:relative;
+    min-height:3px;
+  }
+  .chart-bar .chart-value{
+    position:absolute;
+    top:-18px;
+    left:0; right:0;
+    text-align:center;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    font-weight:600;
+    color:var(--text);
+  }
+  .chart-bar-label{
+    font-size:9px;
+    color:var(--muted);
+    margin-top:6px;
+    text-align:center;
+    line-height:1.25;
+    font-family:'IBM Plex Mono',monospace;
+    max-width:52px;
+  }
+
+  .empty-state{
+    padding:48px 20px;
+    text-align:center;
+    color:var(--muted);
+    font-size:13.5px;
+  }
+  .empty-state .em-icon{font-family:'IBM Plex Mono',monospace; font-size:22px; color:var(--border); margin-bottom:10px;}
+
+  .panel-foot{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:14px;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+
+  /* ---------- Roster panel ---------- */
+  .roster-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:20px;
+    align-items:start;
+  }
+  @media (max-width:900px){ .roster-grid{grid-template-columns:1fr;} }
+  .roster-card{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:18px;
+  }
+  .roster-card h3{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:15px;
+    margin:0 0 4px;
+  }
+  .roster-card .role-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--muted);
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    margin-bottom:14px;
+    display:block;
+  }
+  .roster-add{display:flex; gap:8px; margin-top:4px;}
+  .roster-add input{flex:1;}
+
+  .member-grid{display:flex; flex-direction:column; gap:8px; margin-bottom:14px;}
+  .member-card{
+    background:var(--panel-alt);
+    border:1px solid var(--border-soft);
+    border-radius:8px;
+    padding:0;
+    overflow:hidden;
+  }
+  .member-card-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:10px 14px;
+  }
+  .member-name-btn{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    background:none;
+    border:none;
+    padding:0;
+    flex:1;
+    text-align:left;
+    cursor:pointer;
+    color:var(--text);
+  }
+  .member-name-btn:hover .member-name{color:var(--accent);}
+  .member-name-btn .chevron{
+    color:var(--muted);
+    font-size:11px;
+    transition:transform .15s;
+    flex:none;
+  }
+  .member-card.open .member-name-btn .chevron{transform:rotate(90deg);}
+  .member-card-header .member-name{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:14px;
+    font-weight:600;
+  }
+  .member-fields{
+    display:none;
+    grid-template-columns:1fr 1fr;
+    gap:10px 14px;
+    padding:0 14px 14px;
+  }
+  .member-card.open .member-fields{display:grid;}
+  @media (max-width:520px){ .member-fields{grid-template-columns:1fr;} }
+  .member-field{display:flex; flex-direction:column; gap:4px;}
+  .member-field.full{grid-column:1 / -1;}
+  .member-field label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:10px;
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+  .id-photos{display:flex; gap:8px; flex-wrap:wrap; margin-top:4px;}
+  .photo-slot{
+    width:64px; height:64px;
+    border-radius:6px;
+    border:1px dashed var(--border);
+    background:#fafafa;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+    overflow:hidden;
+    cursor:pointer;
+    flex:none;
+  }
+  .photo-slot:hover{border-color:var(--accent-dim);}
+  .photo-slot img{width:100%; height:100%; object-fit:cover; display:block;}
+  .photo-slot .photo-label{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:9px;
+    color:var(--muted);
+    text-align:center;
+    padding:2px;
+  }
+  .photo-slot .photo-remove{
+    position:absolute; top:1px; right:1px;
+    background:rgba(15,22,31,0.85);
+    color:var(--red);
+    border:none;
+    border-radius:4px;
+    font-size:10px;
+    line-height:1;
+    padding:2px 4px;
+    cursor:pointer;
+  }
+
+  .extract-bar{
+    max-width:960px;
+    margin:36px auto 0;
+    padding:22px 5vw;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:16px;
+    flex-wrap:wrap;
+    text-align:center;
+  }
+  .extract-btn{
+    font-family:'Space Grotesk',sans-serif;
+    font-size:14.5px;
+    padding:13px 26px;
+    box-shadow:0 0 0 1px rgba(255,121,0,0.3), 0 8px 24px -8px rgba(255,121,0,0.35);
+  }
+  .extract-hint{
+    color:var(--muted);
+    font-size:12px;
+    font-family:'IBM Plex Mono',monospace;
+  }
+
+  footer{
+    text-align:center;
+    color:var(--muted);
+    font-size:11.5px;
+    font-family:'IBM Plex Mono',monospace;
+    padding:30px 5vw 0;
+    letter-spacing:0.03em;
+  }
+
+  .toast{
+    position:fixed;
+    bottom:22px;
+    left:50%;
+    transform:translateX(-50%) translateY(12px);
+    background:var(--panel-alt);
+    border:1px solid var(--accent-dim);
+    color:var(--text);
+    padding:10px 18px;
+    border-radius:8px;
+    font-size:13px;
+    font-family:'IBM Plex Mono',monospace;
+    opacity:0;
+    pointer-events:none;
+    transition:opacity .25s, transform .25s;
+    z-index:50;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  /* ---------- Mobile / PWA ---------- */
+  body{padding-left:env(safe-area-inset-left); padding-right:env(safe-area-inset-right); padding-bottom:env(safe-area-inset-bottom);}
+  .table-wrap{-webkit-overflow-scrolling:touch; overscroll-behavior:contain;}
+  @media (max-width:760px){
+    nav.tabs{flex-wrap:nowrap; overflow-x:auto; gap:8px; padding:12px 12px; -webkit-overflow-scrolling:touch; scrollbar-width:none; position:sticky; top:0; z-index:20; background:var(--bg);}
+    nav.tabs::-webkit-scrollbar{display:none;}
+    nav.tabs button{flex:0 0 auto; padding:10px 14px; font-size:13px; white-space:nowrap;}
+    .table-wrap{max-height:none; max-height:calc(100dvh - 150px); border-radius:8px;}
+    table{min-width:820px;}
+    thead th{padding:10px 10px; font-size:10.5px;}
+    tbody td{padding:7px 8px;}
+    input[type="text"], input[type="date"], input[type="number"], input[type="time"], select, textarea{font-size:16px; min-height:38px;}
+    button{min-height:38px;}
+  }
+  @media (display-mode: standalone){
+    body{padding-top:env(safe-area-inset-top);}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="brand-eyebrow"><span class="dot"></span>Field Ops · Zone Tracking</div>
+    <h1 class="brand-title">Measurement &amp; Analysis Tracker</h1>
+    <p>Orange QoS Benchmarking Projects & Network validations  </p>
+  </div>
+  <div class="header-right">
+    <img class="brand-logo" alt="Orange" src="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMDAsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCAA4ADgDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD8rbjieQDpuP8AOmVJcf8AHxL/AL5/nX2r8A/2fvAfjL4S6BrGr6Et3qNykhlmM8i7iJGA4DY6AV4WcZxQyWgsRiE2m7aejfVrse/kuS4jPK8sPhmk0r69rpdE+58TUV+jP/DK/wAMf+haX/wJl/8AiqP+GV/hj/0LS/8AgTL/APFV8f8A8RAyv+Sf3L/5I+0/4h3mv/PyH3v/AORPzmor9Gf+GV/hj/0LS/8AgTL/APFV57+0B8APAfgz4R6/rGj6EtpqNssRimE8jbcyqp4LY6E11YXjjLsXXhh4QnebSWi6u3c5MVwHmWDw9TE1JwtBNuzfRX7HxRRRRX6Gfm5Jcf8AHxJ/vn+dfox+y3/yQrwv/wBc5f8A0a9fnPcf8fEn++f51+jH7Lf/ACQrwv8A9c5f/Rr1+Y+IH/Isp/41+Uj9U8Ov+RpU/wAD/wDSonq1FFFfz6f0SFeT/tUf8kI8Uf7sP/o5K9Yryf8Aao/5IT4n/wB2H/0cle3kf/I0w3+OP5o8TPP+RXif8EvyZ+ctFFFf1qfx6SXH/HxJ/vn+dfpj+xz4R1PxT8CvDv8AZ8cZWJWRpJ5liXe8zhEBYgFmIOB1OK/M64/4+JP98/zr7o/Zj/bD8GfB/wCE+keH9Uuo57mFhPLa3FlNIkcySu0cgZMcgN0zg55r4jizBPHYWlS5JSXPd8qu/hl69bH3fCGO+oYurVU4xfJZczsvij5rW1+p9V/8K61xRYebFb2xvgxhW4uURsKSpJBPHIxz3qWf4Y+IraG5kls0Q24mLRGZPMbym2ybVzltpPOK8cj/AOChngYXiXU2qrcTLZtZFn064BKNKZS25QCG3HqCOOKkvv8Agop4K1C8e7k1gJO0d1H8umz4AnILkcdQRxX5X/q7Dlb+r1r/AOH0129T9Y/1kq8yX1ihb/F62W/p+fkexN8K/Easq/ZoD87pIRcoRAyKGcSc/IVDLnPrXh/7YmgP4f8Agb4stLx2j1KHyFlt9uQAZUIYMOCDxjHrXW6x/wAFIfhatpANJvrhbqWWaa/kl02aIXBlRFYHYSckoDuBHbAr57/aO/al8D/FL4c+JLDTdSkl1W/EXlQfZplX5ZEONz56BT1Nelh8geDx1CVChUdpxu2nZK6bey2/rueZX4geNwNeOIr00nCdkmrt2aStd6Pp1216HxPRRRX7yfz+W7jT7r7RJ/o033j/AMsz6/So/wCz7r/n2m/79miigA/s+6/59pv+/Zo/s+6/59pv+/ZoooAP7Puv+fab/v2aP7Puv+fab/v2aKKAA2F0Bk20wH+4aKKKAP/Z">
+    <div class="header-actions">
+      <button class="ghost icon-btn" id="firebaseToggleBtn">🔥 Firebase Sync</button>
+      <button class="ghost icon-btn" id="driveToggleBtn">☁ Drive Sync</button>
+      <button class="ghost icon-btn" id="exportBtn" title="Export all data as JSON">⭳ Export</button>
+      <button class="ghost icon-btn" id="importBtn" title="Import data from JSON">⭱ Import</button>
+      <input type="file" id="importFile" accept=".json" style="display:none;">
+      <input type="file" id="attachFileInput" accept=".eml,.msg,message/rfc822,application/vnd.ms-outlook" style="display:none;">
+    </div>
+  </div>
+</header>
+
+<div class="drive-bar" id="firebaseBar">
+  <div class="drive-row">
+    <div class="drive-status">
+      <span class="dot-status" id="firebaseDot"></span>
+      <span id="firebaseStatusText">Not connected — this is the recommended store for multi-device / audit use</span>
+    </div>
+    <div class="drive-controls" id="firebaseControlsSetup">
+      <textarea id="firebaseConfigInput" placeholder='Paste the whole "const firebaseConfig = { ... };" block from Firebase, or just the object' style="width:340px; height:60px; font-family:'IBM Plex Mono',monospace; font-size:11.5px;"></textarea>
+      <button class="primary" id="connectFirebaseBtn">Connect Firebase</button>
+    </div>
+    <div class="drive-controls" id="firebaseControlsConnected" style="display:none;">
+      <span class="sync-time" id="firebaseLastSyncText"></span>
+      <button id="firebaseSyncNowBtn">Sync now</button>
+      <button class="ghost" id="disconnectFirebaseBtn">Disconnect</button>
+    </div>
+  </div>
+  <p class="drive-help">Once connected, every change here saves to a Firestore document in <strong>your own</strong> Firebase project, and updates live on any other device/browser signed in to the same project — this is the persistent, audited backing store. A lightweight time-stamped entry is also written to an <code>auditLog</code> collection on every sync.</p>
+  <details class="drive-guide">
+    <summary>How to set this up (one-time, ~5 minutes)</summary>
+    <ol>
+      <li>Go to the <a href="https://console.firebase.google.com/" target="_blank" rel="noopener">Firebase Console</a> → <strong>Add project</strong> (free "Spark" plan is enough for this).</li>
+      <li>In the project, go to <strong>Build → Firestore Database</strong> → <strong>Create database</strong> (start in test mode, then tighten the rules below).</li>
+      <li>Go to <strong>Project settings</strong> (⚙ icon) → scroll to <strong>Your apps</strong> → click the <strong>Web (&lt;/&gt;)</strong> icon → register an app (no hosting needed).</li>
+      <li>Copy the <code>firebaseConfig</code> object shown (starts with <code>apiKey</code>) and paste the whole thing above.</li>
+      <li><strong>Important — security:</strong> Firestore's default "test mode" rules allow anyone with this config to read/write. Since only you should edit this data, go to <strong>Firestore → Rules</strong> and restrict access — e.g. require Firebase Authentication, or at minimum set an expiry and IP/App Check restriction. This app itself doesn't implement a login screen.</li>
+    </ol>
+  </details>
+</div>
+
+<div class="drive-bar" id="driveBar">
+  <div class="drive-row">
+    <div class="drive-status">
+      <span class="dot-status" id="driveDot"></span>
+      <span id="driveStatusText">Not connected — data saved to this browser only</span>
+    </div>
+    <div class="drive-controls" id="driveControlsSetup">
+      <input type="text" id="clientIdInput" placeholder="Paste your Google OAuth Client ID…">
+      <button class="primary" id="connectDriveBtn">Connect Google Drive</button>
+    </div>
+    <div class="drive-controls" id="driveControlsConnected" style="display:none;">
+      <span class="sync-time" id="lastSyncText"></span>
+      <button id="syncNowBtn">Sync now</button>
+      <button class="ghost" id="disconnectDriveBtn">Disconnect</button>
+    </div>
+  </div>
+  <p class="drive-help">Once connected, everything you type here is saved automatically to a file named <code>field-ops-tracker-data.json</code> in your Google Drive. No server, no other users involved.</p>
+  <details class="drive-guide">
+    <summary>How to get a Client ID (one-time, ~3 minutes)</summary>
+    <ol>
+      <li>Open <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud Console → Credentials</a> (create a project first if you don't have one).</li>
+      <li>Click <strong>Enable APIs and Services</strong> → search for and enable the <strong>Google Drive API</strong>.</li>
+      <li>Go to <strong>OAuth consent screen</strong> → set it to <em>External</em> → add your own Google account as a <em>test user</em>.</li>
+      <li>Go to <strong>Credentials</strong> → <strong>Create Credentials</strong> → <strong>OAuth client ID</strong> → type <em>Web application</em>.</li>
+      <li>Under <strong>Authorized JavaScript origins</strong>, add the exact address this page will be opened from (e.g. <code>http://localhost:8000</code>).</li>
+      <li>Copy the Client ID and paste it above. Important: this file must be opened via <code>http://</code> or <code>https://</code> (e.g. by running a tiny local server) — not by double-clicking it — for Google sign-in to work.</li>
+    </ol>
+  </details>
+</div>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="merged">🏠 Merged Plan <span class="count" id="countMerged">0</span></button>
+  <button class="tab-btn" data-tab="measurements">Measurement Plan <span class="count" id="countMeasurements">0</span></button>
+  <button class="tab-btn" data-tab="analysis">Analysis Plan <span class="count" id="countAnalysis">0</span></button>
+  <button class="tab-btn" data-tab="searchMeasurements">Search Measurements</button>
+  <button class="tab-btn" data-tab="searchAnalysis">Search Analysis</button>
+  <button class="tab-btn" data-tab="roster">Team Members</button>
+</nav>
+
+<main>
+
+  <!-- MEASUREMENTS -->
+  <section class="panel" id="panel-measurements">
+    <div class="panel-head">
+      <div>
+        <h2>Measurement Plan</h2>
+        <div class="sub">Field runs assigned to technicians</div>
+      </div>
+      <div class="head-btns">
+        <button class="secondary" data-add="measurements" data-count="10">+ Add 10 rows</button>
+        <button class="primary" data-add="measurements" data-count="1">+ Add row</button>
+      </div>
+    </div>
+    <div class="period-bar">
+      <span class="period-label">Period</span>
+      <select class="pill-select" id="measMonthSelect"></select>
+      <select class="pill-select" id="measYearSelect"></select>
+      <button class="ghost" id="measPeriodReset">This month</button>
+      <span class="period-count" id="measPeriodCount"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="col-date">Date of measurement</th>
+            <th class="col-name">Technician 1</th>
+            <th class="col-name">Technician 2</th>
+            <th class="col-zone">Project</th>
+            <th class="col-zone">Category</th>
+            <th class="col-zone">Target zone</th>
+            <th class="col-zone">Location</th>
+            <th class="col-tech">Technology</th>
+            <th class="col-comments">Comments</th>
+            <th class="col-del"></th>
+          </tr>
+        </thead>
+        <tbody id="measurementsBody"></tbody>
+      </table>
+      <div class="empty-state" id="measurementsEmpty" style="display:none;">
+        <div class="em-icon">···</div>
+        No measurements logged yet. Add rows above.
+      </div>
+    </div>
+  </section>
+
+  <!-- ANALYSIS -->
+  <section class="panel" id="panel-analysis">
+    <div class="panel-head">
+      <div>
+        <h2>Analysis Plan</h2>
+        <div class="sub">Report work assigned to engineers</div>
+      </div>
+      <div class="head-btns">
+        <button class="secondary" data-add="analysis" data-count="10">+ Add 10 rows</button>
+        <button class="primary" data-add="analysis" data-count="1">+ Add row</button>
+      </div>
+    </div>
+    <p class="drive-help" style="margin-bottom:14px;">To attach an email from Outlook: open it, then drag it out of the message list onto your desktop (or <strong>File → Save As</strong> and choose <strong>.eml</strong>/<strong>.msg</strong>) — then use the 📎 button on a row to attach that saved file.</p>
+    <div class="period-bar">
+      <span class="period-label">Period</span>
+      <select class="pill-select" id="anaMonthSelect"></select>
+      <select class="pill-select" id="anaYearSelect"></select>
+      <button class="ghost" id="anaPeriodReset">This month</button>
+      <span class="period-count" id="anaPeriodCount"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="col-tech">Source</th>
+            <th class="col-date">Date of measurement</th>
+            <th class="col-name">Technician 1</th>
+            <th class="col-name">Technician 2</th>
+            <th class="col-zone">Project</th>
+            <th class="col-zone">Category</th>
+            <th class="col-zone">Target zone</th>
+            <th class="col-zone">Location</th>
+            <th class="col-tech">Technology</th>
+            <th class="col-comments">Comments</th>
+            <th class="col-date">Date of analysis</th>
+            <th class="col-name">Assignee</th>
+            <th class="col-date">Report delivered</th>
+            <th class="col-status">Status</th>
+            <th class="col-attach">Attachment</th>
+            <th class="col-del"></th>
+          </tr>
+        </thead>
+        <tbody id="analysisBody"></tbody>
+      </table>
+      <div class="empty-state" id="analysisEmpty" style="display:none;">
+        <div class="em-icon">···</div>
+        No analysis entries yet. Add rows above.
+      </div>
+    </div>
+  </section>
+
+  <!-- MERGED -->
+  <section class="panel active" id="panel-merged">
+    <div class="panel-head">
+      <div>
+        <h2>Merged Plan</h2>
+        <div class="sub">Read-only overview — auto-generated from the Measurement &amp; Analysis Plans, matched by date</div>
+      </div>
+    </div>
+    <div class="charts-row" id="mergedCharts"></div>
+    <div class="period-bar">
+      <span class="period-label">Period</span>
+      <select class="pill-select" id="mergedMonthSelect"></select>
+      <select class="pill-select" id="mergedYearSelect"></select>
+      <button class="ghost" id="mergedPeriodReset">This month</button>
+      <span class="period-count" id="mergedPeriodCount"></span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="col-date">Date of measurement</th>
+            <th class="col-zone">Project</th>
+            <th class="col-zone">Category</th>
+            <th class="col-zone">Target zone</th>
+            <th class="col-zone">Location</th>
+            <th class="col-tech">Technology</th>
+            <th class="col-comments">Comments</th>
+            <th class="col-date">Date of analysis</th>
+            <th class="col-name">Assignee</th>
+            <th class="col-date">Report delivered</th>
+            <th class="col-status">Status</th>
+          </tr>
+        </thead>
+        <tbody id="mergedBody"></tbody>
+      </table>
+      <div class="empty-state" id="mergedEmpty" style="display:none;">
+        <div class="em-icon">···</div>
+        Nothing yet — add rows in the Measurement Plan and they'll appear here automatically.
+      </div>
+    </div>
+  </section>
+
+  <!-- SEARCH MEASUREMENTS -->
+  <section class="panel" id="panel-searchMeasurements">
+    <div class="panel-head">
+      <div>
+        <h2>Search Measurements</h2>
+        <div class="sub">Filter the Measurement Plan — results update live and are editable</div>
+      </div>
+    </div>
+    <div class="search-bar">
+      <div class="search-field">
+        <label>Date of measurement</label>
+        <input type="date" id="sMeasDate">
+      </div>
+      <div class="search-field">
+        <label>Technician</label>
+        <select id="sMeasTech"><option value="">Any technician</option></select>
+      </div>
+      <div class="search-field grow">
+        <label>Target zone</label>
+        <input type="text" id="sMeasZone" placeholder="Search by zone…">
+      </div>
+      <div class="search-field">
+        <label>From</label>
+        <input type="date" id="sMeasFrom">
+      </div>
+      <div class="search-field">
+        <label>To</label>
+        <input type="date" id="sMeasTo">
+      </div>
+      <button class="ghost" id="sMeasClear">Clear filters</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="col-date">Date of measurement</th>
+            <th class="col-name">Technician 1</th>
+            <th class="col-name">Technician 2</th>
+            <th class="col-zone">Project</th>
+            <th class="col-zone">Category</th>
+            <th class="col-zone">Target zone</th>
+            <th class="col-zone">Location</th>
+            <th class="col-tech">Technology</th>
+            <th class="col-comments">Comments</th>
+            <th class="col-del"></th>
+          </tr>
+        </thead>
+        <tbody id="searchMeasBody"></tbody>
+      </table>
+      <div class="empty-state" id="searchMeasEmpty" style="display:none;">
+        <div class="em-icon">···</div>
+        No measurements match these filters.
+      </div>
+    </div>
+  </section>
+
+  <!-- SEARCH ANALYSIS -->
+  <section class="panel" id="panel-searchAnalysis">
+    <div class="panel-head">
+      <div>
+        <h2>Search Analysis</h2>
+        <div class="sub">Filter the Analysis Plan — results update live and are editable</div>
+      </div>
+    </div>
+    <div class="search-bar">
+      <div class="search-field">
+        <label>Date of measurement</label>
+        <input type="date" id="sAnaMeasDate">
+      </div>
+      <div class="search-field">
+        <label>Technician</label>
+        <select id="sAnaTech"><option value="">Any technician</option></select>
+      </div>
+      <div class="search-field grow">
+        <label>Target zone</label>
+        <input type="text" id="sAnaZone" placeholder="Search by zone…">
+      </div>
+      <div class="search-field">
+        <label>From</label>
+        <input type="date" id="sAnaFrom">
+      </div>
+      <div class="search-field">
+        <label>To</label>
+        <input type="date" id="sAnaTo">
+      </div>
+      <div class="search-field">
+        <label>Date of analysis</label>
+        <input type="date" id="sAnaDate">
+      </div>
+      <div class="search-field">
+        <label>Report delivered</label>
+        <input type="date" id="sAnaDelivered">
+      </div>
+      <button class="ghost" id="sAnaClear">Clear filters</button>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="col-tech">Source</th>
+            <th class="col-date">Date of measurement</th>
+            <th class="col-name">Technician 1</th>
+            <th class="col-name">Technician 2</th>
+            <th class="col-zone">Project</th>
+            <th class="col-zone">Category</th>
+            <th class="col-zone">Target zone</th>
+            <th class="col-zone">Location</th>
+            <th class="col-tech">Technology</th>
+            <th class="col-comments">Comments</th>
+            <th class="col-date">Date of analysis</th>
+            <th class="col-name">Assignee</th>
+            <th class="col-date">Report delivered</th>
+            <th class="col-status">Status</th>
+            <th class="col-attach">Attachment</th>
+            <th class="col-del"></th>
+          </tr>
+        </thead>
+        <tbody id="searchAnaBody"></tbody>
+      </table>
+      <div class="empty-state" id="searchAnaEmpty" style="display:none;">
+        <div class="em-icon">···</div>
+        No analysis entries match these filters.
+      </div>
+    </div>
+  </section>
+
+  <!-- ROSTER -->
+  <section class="panel" id="panel-roster">
+    <div class="panel-head">
+      <div>
+        <h2>Team Roster</h2>
+        <div class="sub">Team member database — names populate the dropdowns; details are stored per member</div>
+      </div>
+    </div>
+    <div class="roster-grid">
+      <div class="roster-card">
+        <h3>Technicians</h3>
+        <span class="role-label">Measurement team</span>
+        <div class="member-grid" id="techList"></div>
+        <div class="roster-add">
+          <input type="text" id="newTech" placeholder="Add technician name…">
+          <button class="primary" id="addTechBtn">Add</button>
+        </div>
+      </div>
+      <div class="roster-card">
+        <h3>Engineers</h3>
+        <span class="role-label">Analysis team</span>
+        <div class="member-grid" id="engList"></div>
+        <div class="roster-add">
+          <input type="text" id="newEng" placeholder="Add engineer name…">
+          <button class="primary" id="addEngBtn">Add</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<input type="file" id="memberPhotoInput" accept="image/*" style="display:none;">
+
+<datalist id="techList_dl"></datalist>
+<datalist id="technologyOptions">
+  <option value="2G">
+  <option value="3G">
+  <option value="4G">
+  <option value="5G">
+  <option value="FTTx">
+  <option value="Microwave">
+</datalist>
+<datalist id="zoneOptions"></datalist>
+<datalist id="projectOptions"></datalist>
+<datalist id="categoryOptions"></datalist>
+
+<div class="extract-bar">
+  <button class="primary extract-btn" id="extractExcelBtn">⇩ Extract to Excel</button>
+  <span class="extract-hint">Downloads all three plans as one .xlsx workbook, ready to edit</span>
+</div>
+
+<footer>Local data lives in this browser · connect Google Drive above to save it to your own Drive instead</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  const LS_KEYS = {
+    tech: 'fot_technicians',
+    eng: 'fot_engineers',
+    meas: 'fot_measurements',
+    ana: 'fot_analysis',
+    merged: 'fot_merged',
+    members: 'fot_team_members'
+  };
+
+  function load(key, fallback){
+    try{
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    }catch(e){ return fallback; }
+  }
+  function uid(){ return 'r' + Math.random().toString(36).slice(2,10); }
+
+  const TECHNOLOGY_OPTIONS = ['4G Data','5G Data','VoLTE','VoLTE&4G Data','VoLTE&5G Data'];
+  const CATEGORY_OPTIONS = [
+    'Triple Play Compounds - New Cairo & El Sherouk',
+    'Triple Play Compounds - Zayed & October',
+    'ILCAMPO - New Cairo & El Sherouk',
+    'ILCAMPO - Zayed & October'
+  ];
+  const PROJECT_OPTIONS = ['Compounds'];
+
+  // Compound (Target zone) → Category lookup, so picking/typing a known compound name
+  // auto-fills Project + Category (only when those fields are still empty).
+  const COMPOUND_CATEGORY_MAP = {};
+  const COMPOUND_DISPLAY_NAMES = [];
+  (function(){
+    const groups = {
+      'Triple Play Compounds - New Cairo & El Sherouk': ['Uptown Cairo','Mivida','Stone Park','Granda El Sherouk','90 Avenue',
+        'Chill out Park','The Address East','SODIC East','SODIC Eastown Residence','Villette','Layan','Al Jazi Egypt',
+        'Katamyea Plaza','Swan Lake Residence','Capital East','One Ninety',"3'Sixty"],
+      'Triple Play Compounds - Zayed & October': ['New Giza','Mena Garden City','Green 4','Green 5','Garden Hills',
+        'October Park','Grand Heights','SODIC October Plaza','SODIC West','Hadayek El Mohandeseen','Creek Park',
+        'Address West','Kayan','Owest','Bedaya'],
+      'ILCAMPO - New Cairo & El Sherouk': ['Mountain View 2','Palm Hills Kattameya 1','Taj Sultan','Kattameya Dunes',
+        'Swan Lake','Nakheel Village','Palm Hills the Village Gate','Palm Hills the Village Gardens','MayFair',
+        'Sherouk 2000','Loaloa El Sherouk','El Patio 4','Arabella','El Patio 1','El Patio 2','Moon Valley','La Rosa',
+        'Zizinia','Grand Residence','Dyar','Bellagio Sabbour','Casa Verde','Rehab','Madinaty','CFC','Creek Town',
+        'Waterway 2','Porto Cairo','Mirage City','Waterway','Palm Hills Kattameya 2','Hyde park','Lake View',
+        'Kattameya Heights','The Village Palm Hills','Les Rois','Mountain View 1','Park View'],
+      'ILCAMPO - Zayed & October': ['Rabwa Compound','Allegria','Beverly Hills','Zayed 2000','Greens Compound',
+        'Zayed Dunes','Karma 1','Karma 2','Casa Compound','Nada Compound','Royal City','Palm Hills',
+        'Palm Hills Golf View','Palm Hills Golf Extension','Palm Parks','Porto Pyramids','West Gate','Grand Resort',
+        'Karma 3','Azizyah','Al Guezira','Safwa City','Dream Land','Zayed Complex','City View','October Hills',
+        'EL Khamayel','Jeera','ETAPA','Patio Al-Zahraa','Zayed Regency Compound','Meadows Park','Royal Meadows',
+        'Moon Land','Belle Ville','TARA','Palm Hills the crown','Gardenia Park 1','Gardenia Park 2',
+        'El Patio 6 October','Porto October','Garana Compound','Aziza 2 Compound']
+    };
+    Object.keys(groups).forEach(cat=>{
+      groups[cat].forEach(name=>{
+        COMPOUND_CATEGORY_MAP[name.trim().toLowerCase()] = cat;
+        COMPOUND_DISPLAY_NAMES.push(name);
+      });
+    });
+    // aliases for older/longer zone names already used in earlier-generated schedules,
+    // so existing rows still get tagged without needing their Target zone text changed
+    COMPOUND_CATEGORY_MAP['villette sodic'] = COMPOUND_CATEGORY_MAP['villette'];
+    COMPOUND_CATEGORY_MAP['layan sabbour'] = COMPOUND_CATEGORY_MAP['layan'];
+    COMPOUND_CATEGORY_MAP['swan lake (ilcampo)'] = COMPOUND_CATEGORY_MAP['swan lake'];
+    COMPOUND_CATEGORY_MAP['swan lake (zayed)'] = COMPOUND_CATEGORY_MAP['swan lake'];
+    COMPOUND_CATEGORY_MAP['palm hills (6 october)'] = COMPOUND_CATEGORY_MAP['palm hills'];
+  })();
+
+  let technicians = load(LS_KEYS.tech, ['Technician 1','Technician 2']);
+  let engineers   = load(LS_KEYS.eng, ['Engineer 1','Engineer 2']);
+  let measurements = load(LS_KEYS.meas, []);
+  let analysis      = load(LS_KEYS.ana, []);
+  let merged        = load(LS_KEYS.merged, []);
+  let teamMembers   = load(LS_KEYS.members, {});
+
+  function blankMember(){
+    return { mobile:'', orangeId:'', orangeIdPhoto:null, nationalId:'', nationalIdPhotoFront:null, nationalIdPhotoBack:null };
+  }
+  function getMember(name){
+    if(!teamMembers[name]) teamMembers[name] = blankMember();
+    return teamMembers[name];
+  }
+
+  // migrate older analysis rows (pre-link fields) so no data is lost
+  analysis.forEach(a=>{
+    if(a.linkId === undefined) a.linkId = null;
+    if(a.measZone === undefined) a.measZone = a.zone || '';
+    if(a.measComments === undefined) a.measComments = a.comments || '';
+    if(a.measDate === undefined) a.measDate = '';
+    if(a.measTech1 === undefined) a.measTech1 = '';
+    if(a.measTech2 === undefined) a.measTech2 = '';
+    if(a.measLocation === undefined) a.measLocation = '';
+    if(a.measTechnology === undefined) a.measTechnology = '';
+    if(a.measProject === undefined) a.measProject = '';
+    if(a.measCategory === undefined) a.measCategory = '';
+    if(a.status === 'pending') a.status = 'notassigned'; // legacy status scheme
+  });
+  measurements.forEach(m=>{
+    if(m.location === undefined) m.location = '';
+    if(m.technology === undefined) m.technology = '';
+    if(m.project === undefined) m.project = '';
+    if(m.category === undefined) m.category = '';
+  });
+  reconcileMeasurementCategories();
+
+  // One-time fill: match each measurement's Target zone against the known compound list
+  // and set Project/Category where they're still blank, propagating into any linked analysis row.
+  function reconcileMeasurementCategories(){
+    let changedAny = false;
+    measurements.forEach(m=>{
+      if(autoFillCategory(m)) changedAny = true;
+    });
+    if(changedAny){
+      analysis.forEach(a=>{
+        if(!a.linkId) return;
+        const src = measurements.find(m => m.id === a.linkId);
+        if(src){ a.measProject = src.project; a.measCategory = src.category; }
+      });
+    }
+    return changedAny;
+  }
+
+  // make sure every measurement row has a linked analysis row
+  function reconcileLinks(){
+    let changed = false;
+    measurements.forEach(m=>{
+      if(!analysis.find(a => a.linkId === m.id)){
+        analysis.push(createLinkedAnalysisRow(m));
+        changed = true;
+      }
+    });
+    if(changed) localStorage.setItem(LS_KEYS.ana, JSON.stringify(analysis));
+  }
+
+  function save(key, val){
+    localStorage.setItem(key, JSON.stringify(val));
+    scheduleDriveSync();
+    scheduleFirebaseSync();
+  }
+
+  function toast(msg){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._timer);
+    t._timer = setTimeout(()=>t.classList.remove('show'), 1800);
+  }
+
+  /* ---------- Tabs ---------- */
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+
+  /* ---------- Roster ---------- */
+  function nameOption(name){
+    const opt = document.createElement('option');
+    opt.value = name; opt.textContent = name;
+    return opt;
+  }
+  function measurementAssignees(){
+    // Technicians normally do measurements, but engineers can be assigned too.
+    const combined = technicians.concat(engineers);
+    return combined.filter((n, i) => combined.indexOf(n) === i);
+  }
+  function buildSelect(list, selected, placeholder){
+    const sel = document.createElement('select');
+    const empty = document.createElement('option');
+    empty.value = ''; empty.textContent = placeholder;
+    sel.appendChild(empty);
+    list.forEach(n => {
+      const opt = nameOption(n);
+      if(n === selected) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    return sel;
+  }
+
+  let photoTarget = null; // { name, field } while the hidden photo input is open
+  const expandedMembers = new Set(); // names currently expanded in the Team Roster list
+
+  function makePhotoSlot(name, field, label){
+    const slot = document.createElement('div');
+    slot.className = 'photo-slot';
+    const member = getMember(name);
+    const photo = member[field];
+    if(photo){
+      const img = document.createElement('img');
+      img.src = photo.dataUrl;
+      img.alt = label;
+      slot.appendChild(img);
+      const rm = document.createElement('button');
+      rm.className = 'photo-remove';
+      rm.textContent = '✕';
+      rm.title = 'Remove photo';
+      rm.addEventListener('click', ev=>{
+        ev.stopPropagation();
+        member[field] = null;
+        save(LS_KEYS.members, teamMembers);
+        renderRoster();
+      });
+      slot.appendChild(rm);
+    } else {
+      const lbl = document.createElement('span');
+      lbl.className = 'photo-label';
+      lbl.textContent = '📎 ' + label;
+      slot.appendChild(lbl);
+    }
+    slot.title = label;
+    slot.addEventListener('click', ()=>{
+      photoTarget = { name, field };
+      document.getElementById('memberPhotoInput').click();
+    });
+    return slot;
+  }
+
+  document.getElementById('memberPhotoInput').addEventListener('change', e=>{
+    const file = e.target.files[0];
+    e.target.value = '';
+    if(!file || !photoTarget) return;
+    if(file.size > 8 * 1024 * 1024){ toast('That photo is too large (8MB limit)'); photoTarget = null; return; }
+    const reader = new FileReader();
+    reader.onload = evt=>{
+      const member = getMember(photoTarget.name);
+      member[photoTarget.field] = { name: file.name, dataUrl: evt.target.result };
+      save(LS_KEYS.members, teamMembers);
+      renderRoster();
+      photoTarget = null;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function makeMemberTextField(name, field, label, placeholder){
+    const wrap = document.createElement('div');
+    wrap.className = 'member-field';
+    const lbl = document.createElement('label');
+    lbl.textContent = label;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = placeholder || '';
+    input.value = getMember(name)[field] || '';
+    input.addEventListener('input', e=>{
+      getMember(name)[field] = e.target.value;
+      save(LS_KEYS.members, teamMembers);
+    });
+    wrap.append(lbl, input);
+    return wrap;
+  }
+
+  function buildMemberCard(name, onRemove){
+    const card = document.createElement('div');
+    card.className = 'member-card';
+    if(expandedMembers.has(name)) card.classList.add('open');
+
+    const header = document.createElement('div');
+    header.className = 'member-card-header';
+
+    const nameBtn = document.createElement('button');
+    nameBtn.type = 'button';
+    nameBtn.className = 'member-name-btn';
+    const chevron = document.createElement('span');
+    chevron.className = 'chevron';
+    chevron.textContent = '▸';
+    const nameEl = document.createElement('span');
+    nameEl.className = 'member-name';
+    nameEl.textContent = name;
+    nameBtn.append(chevron, nameEl);
+    nameBtn.addEventListener('click', ()=>{
+      const isOpen = card.classList.toggle('open');
+      if(isOpen) expandedMembers.add(name); else expandedMembers.delete(name);
+    });
+
+    const del = document.createElement('button');
+    del.className = 'danger-text';
+    del.textContent = 'Remove';
+    del.addEventListener('click', onRemove);
+    header.append(nameBtn, del);
+
+    const fields = document.createElement('div');
+    fields.className = 'member-fields';
+    fields.appendChild(makeMemberTextField(name, 'mobile', 'Mobile number', 'e.g. 010xxxxxxxx'));
+
+    const orangeIdWrap = document.createElement('div');
+    orangeIdWrap.className = 'member-field full';
+    const orangeLbl = document.createElement('label');
+    orangeLbl.textContent = 'Orange ID no.';
+    const orangeInput = document.createElement('input');
+    orangeInput.type = 'text';
+    orangeInput.value = getMember(name).orangeId || '';
+    orangeInput.addEventListener('input', e=>{ getMember(name).orangeId = e.target.value; save(LS_KEYS.members, teamMembers); });
+    const orangePhotos = document.createElement('div');
+    orangePhotos.className = 'id-photos';
+    orangePhotos.appendChild(makePhotoSlot(name, 'orangeIdPhoto', 'Photo'));
+    orangeIdWrap.append(orangeLbl, orangeInput, orangePhotos);
+
+    const nationalIdWrap = document.createElement('div');
+    nationalIdWrap.className = 'member-field full';
+    const natLbl = document.createElement('label');
+    natLbl.textContent = 'National ID no.';
+    const natInput = document.createElement('input');
+    natInput.type = 'text';
+    natInput.value = getMember(name).nationalId || '';
+    natInput.addEventListener('input', e=>{ getMember(name).nationalId = e.target.value; save(LS_KEYS.members, teamMembers); });
+    const natPhotos = document.createElement('div');
+    natPhotos.className = 'id-photos';
+    natPhotos.appendChild(makePhotoSlot(name, 'nationalIdPhotoFront', 'Front'));
+    natPhotos.appendChild(makePhotoSlot(name, 'nationalIdPhotoBack', 'Back'));
+    nationalIdWrap.append(natLbl, natInput, natPhotos);
+
+    fields.append(orangeIdWrap, nationalIdWrap);
+    card.append(header, fields);
+    return card;
+  }
+
+  function renderRoster(){
+    const techList = document.getElementById('techList');
+    const engList = document.getElementById('engList');
+    techList.innerHTML = '';
+    engList.innerHTML = '';
+    technicians.forEach((name, i)=>{
+      techList.appendChild(buildMemberCard(name, ()=>{
+        technicians.splice(i,1);
+        delete teamMembers[name];
+        expandedMembers.delete(name);
+        save(LS_KEYS.tech, technicians);
+        save(LS_KEYS.members, teamMembers);
+        renderRoster(); renderMeasurements(); renderMerged();
+      }));
+    });
+    engineers.forEach((name, i)=>{
+      engList.appendChild(buildMemberCard(name, ()=>{
+        engineers.splice(i,1);
+        delete teamMembers[name];
+        expandedMembers.delete(name);
+        save(LS_KEYS.eng, engineers);
+        save(LS_KEYS.members, teamMembers);
+        renderRoster(); renderAnalysis(); renderMerged();
+      }));
+    });
+  }
+
+  document.getElementById('addTechBtn').addEventListener('click', ()=>{
+    const input = document.getElementById('newTech');
+    const val = input.value.trim();
+    if(!val) return;
+    technicians.push(val);
+    getMember(val);
+    save(LS_KEYS.tech, technicians);
+    save(LS_KEYS.members, teamMembers);
+    input.value = '';
+    renderRoster(); renderMeasurements(); renderMerged();
+  });
+  document.getElementById('addEngBtn').addEventListener('click', ()=>{
+    const input = document.getElementById('newEng');
+    const val = input.value.trim();
+    if(!val) return;
+    engineers.push(val);
+    getMember(val);
+    save(LS_KEYS.eng, engineers);
+    save(LS_KEYS.members, teamMembers);
+    input.value = '';
+    renderRoster(); renderAnalysis(); renderMerged();
+  });
+  ['newTech','newEng'].forEach(id=>{
+    document.getElementById(id).addEventListener('keydown', e=>{
+      if(e.key === 'Enter'){ e.preventDefault(); document.getElementById(id==='newTech'?'addTechBtn':'addEngBtn').click(); }
+    });
+  });
+
+  /* ---------- generic helpers ---------- */
+  function makeDateCell(row, field, storeKey, dataset, afterChange){
+    const td = document.createElement('td');
+    const input = document.createElement('input');
+    input.type = 'date'; input.value = row[field] || '';
+    input.addEventListener('change', e=>{ row[field] = e.target.value; save(storeKey, dataset); if(afterChange) afterChange(row); });
+    td.appendChild(input);
+    return td;
+  }
+  function makeTextCell(row, field, storeKey, dataset, placeholder, useDatalist, afterChange, extraClass){
+    const td = document.createElement('td');
+    const input = document.createElement('input');
+    input.type = 'text'; input.value = row[field] || '';
+    if(placeholder) input.placeholder = placeholder;
+    if(useDatalist) input.setAttribute('list', useDatalist);
+    if(extraClass) input.classList.add(extraClass);
+    input.addEventListener('input', e=>{ row[field] = e.target.value; save(storeKey, dataset); if(afterChange) afterChange(row); });
+    td.appendChild(input);
+    return td;
+  }
+  function makeTextareaCell(row, field, storeKey, dataset, afterChange){
+    const td = document.createElement('td');
+    const ta = document.createElement('textarea');
+    ta.rows = 1; ta.value = row[field] || '';
+    ta.addEventListener('input', e=>{ row[field] = e.target.value; save(storeKey, dataset); if(afterChange) afterChange(row); });
+    td.appendChild(ta);
+    return td;
+  }
+  function makeSelectCell(row, field, storeKey, dataset, options, placeholder, afterChange){
+    const td = document.createElement('td');
+    const sel = buildSelect(options, row[field], placeholder);
+    sel.addEventListener('change', e=>{ row[field] = e.target.value; save(storeKey, dataset); if(afterChange) afterChange(row); });
+    td.appendChild(sel);
+    return td;
+  }
+  function makeDeleteCell(row, storeKey, dataset, rerender){
+    const td = document.createElement('td');
+    td.className = 'col-del';
+    const btn = document.createElement('button');
+    btn.className = 'danger-text'; btn.textContent = '✕'; btn.title = 'Delete row';
+    btn.addEventListener('click', ()=>{
+      const idx = dataset.indexOf(row);
+      if(idx > -1) dataset.splice(idx,1);
+      save(storeKey, dataset);
+      rerender();
+    });
+    td.appendChild(btn);
+    return td;
+  }
+  // Dates are stored as ISO (YYYY-MM-DD) internally for sorting/filtering, but always displayed as dd/mm/yyyy.
+  const WEEKDAY_ABBR = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  function formatDateDMY(iso){
+    if(!iso) return '';
+    const parts = iso.split('-');
+    if(parts.length !== 3) return iso;
+    const [y, m, d] = parts;
+    const dt = new Date(`${iso}T00:00:00`);
+    const dayNum = parseInt(d, 10), monNum = parseInt(m, 10);
+    if(isNaN(dt.getTime())) return `${dayNum}/${monNum}/${y}`;
+    return `${WEEKDAY_ABBR[dt.getDay()]} ${dayNum}/${monNum}/${y}`;
+  }
+  function makeLockedDateCell(iso){
+    return makeLockedCell(formatDateDMY(iso));
+  }
+  // Parses "dd/mm/yy" or "dd/mm/yyyy" back into ISO (YYYY-MM-DD). Returns null if unparseable.
+  function parseDMY(text){
+    const cleaned = text.trim().replace(/^[A-Za-z]+\s+/, ''); // strip an optional leading day name, e.g. "Sun "
+    const m = cleaned.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2}|\d{4})$/);
+    if(!m) return null;
+    let [, d, mo, y] = m;
+    if(y.length === 2) y = '20' + y;
+    d = d.padStart(2,'0'); mo = mo.padStart(2,'0');
+    const iso = `${y}-${mo}-${d}`;
+    const dt = new Date(iso);
+    if(isNaN(dt.getTime())) return null;
+    return iso;
+  }
+  // Editable date field shown as dd/mm/yyyy text, with a small 📅 button that opens a native
+  // date picker to assist selection (its own value stays hidden — only used for picking).
+  function makeEditableDateCell(row, field, storeKey, dataset, afterChange){
+    const td = document.createElement('td');
+    const wrap = document.createElement('div');
+    wrap.className = 'date-field';
+
+    const text = document.createElement('input');
+    text.type = 'text';
+    text.className = 'date-text';
+    text.placeholder = 'dd/mm/yyyy';
+    text.value = formatDateDMY(row[field]);
+
+    const pickBtn = document.createElement('button');
+    pickBtn.type = 'button';
+    pickBtn.className = 'date-pick-btn';
+    pickBtn.textContent = '📅';
+    pickBtn.title = 'Pick a date';
+
+    const hidden = document.createElement('input');
+    hidden.type = 'date';
+    hidden.className = 'date-hidden-picker';
+    hidden.value = row[field] || '';
+    hidden.tabIndex = -1;
+
+    function commit(iso){
+      row[field] = iso || '';
+      text.value = formatDateDMY(iso);
+      hidden.value = iso || '';
+      save(storeKey, dataset);
+      if(afterChange) afterChange(row);
+    }
+
+    text.addEventListener('change', ()=>{
+      const val = text.value.trim();
+      if(!val){ commit(''); return; }
+      const iso = parseDMY(val);
+      if(iso){ commit(iso); }
+      else { toast('Use dd/mm/yyyy'); text.value = formatDateDMY(row[field]); }
+    });
+    pickBtn.addEventListener('click', ()=>{
+      if(hidden.showPicker){ try{ hidden.showPicker(); return; }catch(e){} }
+      hidden.click();
+    });
+    hidden.addEventListener('change', e=> commit(e.target.value));
+
+    wrap.append(text, pickBtn, hidden);
+    td.appendChild(wrap);
+    return td;
+  }
+  function makeLockedCell(value, isTextarea, extraClass){
+    const td = document.createElement('td');
+    const el = document.createElement(isTextarea ? 'textarea' : 'input');
+    if(!isTextarea) el.type = 'text';
+    else el.rows = 1;
+    el.className = 'locked-field';
+    if(extraClass) el.classList.add(extraClass);
+    el.value = value || '';
+    el.readOnly = true;
+    el.tabIndex = -1;
+    td.appendChild(el);
+    return td;
+  }
+
+  /* ---------- Email attachment (per measurement row) ---------- */
+  let attachTarget = null;
+
+  function makeAttachmentCell(row, storeKey, dataset, rerender){
+    const td = document.createElement('td');
+    if(row.attachment){
+      const chip = document.createElement('div');
+      chip.className = 'attach-chip';
+      const link = document.createElement('a');
+      link.href = row.attachment.dataUrl;
+      link.download = row.attachment.name;
+      link.textContent = row.attachment.subject || row.attachment.name;
+      link.title = row.attachment.name + (row.attachment.from ? ' — ' + row.attachment.from : '');
+      const removeBtn = document.createElement('button');
+      removeBtn.textContent = '✕';
+      removeBtn.title = 'Remove attachment';
+      removeBtn.addEventListener('click', ()=>{
+        row.attachment = null;
+        save(storeKey, dataset);
+        rerender();
+      });
+      chip.append('📎', link, removeBtn);
+      td.appendChild(chip);
+    } else {
+      const btn = document.createElement('button');
+      btn.className = 'attach-btn';
+      btn.type = 'button';
+      btn.textContent = '📎 Attach email';
+      btn.addEventListener('click', ()=>{
+        attachTarget = { row, storeKey, dataset, rerender };
+        document.getElementById('attachFileInput').click();
+      });
+      td.appendChild(btn);
+    }
+    return td;
+  }
+
+  function parseEmlMeta(text){
+    const subjectMatch = text.match(/^Subject:\s*(.+)$/im);
+    const fromMatch = text.match(/^From:\s*(.+)$/im);
+    return {
+      subject: subjectMatch ? subjectMatch[1].trim() : '',
+      from: fromMatch ? fromMatch[1].trim() : ''
+    };
+  }
+
+  document.getElementById('attachFileInput').addEventListener('change', e=>{
+    const file = e.target.files[0];
+    e.target.value = '';
+    if(!file || !attachTarget) return;
+    if(file.size > 15 * 1024 * 1024){
+      toast('That file is too large to attach (15MB limit)');
+      attachTarget = null;
+      return;
+    }
+    if(file.size > 3 * 1024 * 1024){
+      toast('Large attachment — this will make local/Drive storage bigger');
+    }
+    const reader = new FileReader();
+    reader.onload = evt=>{
+      const dataUrl = evt.target.result;
+      let subject = '', from = '';
+      if(/\.eml$/i.test(file.name)){
+        try{
+          const base64 = dataUrl.split(',')[1];
+          const meta = parseEmlMeta(atob(base64));
+          subject = meta.subject; from = meta.from;
+        }catch(err){ /* not fatal — just skip metadata */ }
+      }
+      const { row, storeKey, dataset, rerender } = attachTarget;
+      row.attachment = { name: file.name, size: file.size, type: file.type, dataUrl, subject, from };
+      save(storeKey, dataset);
+      rerender();
+      toast('Email attached');
+      attachTarget = null;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  /* ---------- Measurement → Analysis link ---------- */
+  function autoFillCategory(row){
+    if(row.project || row.category) return false; // don't override anything already set
+    const cat = COMPOUND_CATEGORY_MAP[(row.zone||'').trim().toLowerCase()];
+    if(cat){ row.project = 'Compounds'; row.category = cat; return true; }
+    return false;
+  }
+
+  function syncMeasurementToAnalysis(measRow){
+    const linked = analysis.find(a => a.linkId === measRow.id);
+    if(!linked) return;
+    linked.measDate = measRow.date;
+    linked.measTech1 = measRow.tech1;
+    linked.measTech2 = measRow.tech2;
+    linked.measProject = measRow.project;
+    linked.measCategory = measRow.category;
+    linked.measZone = measRow.zone;
+    linked.measLocation = measRow.location;
+    linked.measTechnology = measRow.technology;
+    linked.measComments = measRow.comments;
+    save(LS_KEYS.ana, analysis);
+    renderAnalysis();
+  }
+
+  function createLinkedAnalysisRow(measRow){
+    return {
+      id: uid(), linkId: measRow.id,
+      measDate: measRow.date, measTech1: measRow.tech1, measTech2: measRow.tech2,
+      measProject: measRow.project, measCategory: measRow.category,
+      measZone: measRow.zone, measLocation: measRow.location, measTechnology: measRow.technology,
+      measComments: measRow.comments,
+      date:'', assignee:'', dateAssigned:'', dateDelivery:'', status:'notassigned'
+    };
+  }
+
+  /* ---------- Measurements table ---------- */
+  function buildMeasurementRow(row){
+    const tr = document.createElement('tr');
+    { const eff = effectiveMeasurementStatus(row); if(eff === 'done' || eff === 'inprogress') tr.classList.add('row-' + eff); }
+    const sync = () => {
+      const filled = autoFillCategory(row);
+      syncMeasurementToAnalysis(row);
+      if(filled) renderMeasurements();
+    };
+    const dateSync = () => {
+      autoFillCategory(row);
+      syncMeasurementToAnalysis(row);
+      renderMeasurements(); // date drives Planned/In progress/Done — always repaint row color
+      renderAnalysis(); // keeps mirrored fields + Merged Plan in sync
+    };
+    const tdDel = document.createElement('td');
+    tdDel.className = 'col-del';
+    const delBtn = document.createElement('button');
+    delBtn.className = 'danger-text'; delBtn.textContent = '✕'; delBtn.title = 'Delete row';
+    delBtn.addEventListener('click', ()=>{
+      const idx = measurements.indexOf(row);
+      if(idx > -1) measurements.splice(idx,1);
+      save(LS_KEYS.meas, measurements);
+      const linked = analysis.find(a => a.linkId === row.id);
+      if(linked){ linked.linkId = null; save(LS_KEYS.ana, analysis); renderAnalysis(); }
+      renderMeasurements();
+    });
+    tdDel.appendChild(delBtn);
+
+    tr.append(
+      makeEditableDateCell(row, 'date', LS_KEYS.meas, measurements, dateSync),
+      makeSelectCell(row, 'tech1', LS_KEYS.meas, measurements, measurementAssignees(), 'Select…', sync),
+      makeSelectCell(row, 'tech2', LS_KEYS.meas, measurements, measurementAssignees(), 'Select…', sync),
+      makeTextCell(row, 'project', LS_KEYS.meas, measurements, 'Project', 'projectOptions', sync),
+      makeTextCell(row, 'category', LS_KEYS.meas, measurements, 'Category', 'categoryOptions', sync),
+      makeTextCell(row, 'zone', LS_KEYS.meas, measurements, 'e.g. Zone 4B', 'zoneOptions', sync, 'zone-field'),
+      makeTextCell(row, 'location', LS_KEYS.meas, measurements, 'Location', null, sync),
+      makeSelectCell(row, 'technology', LS_KEYS.meas, measurements, TECHNOLOGY_OPTIONS, 'Select…', sync),
+      makeTextareaCell(row, 'comments', LS_KEYS.meas, measurements, sync),
+      tdDel
+    );
+    return tr;
+  }
+
+  /* ---------- Month/Year period filter (Measurement, Analysis, Merged pages) ---------- */
+  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const _todayForPeriod = new Date();
+  const measPeriodFilter = { month: _todayForPeriod.getMonth()+1, year: _todayForPeriod.getFullYear() };
+  const anaPeriodFilter = { month: _todayForPeriod.getMonth()+1, year: _todayForPeriod.getFullYear() };
+  const mergedPeriodFilter = { month: _todayForPeriod.getMonth()+1, year: _todayForPeriod.getFullYear() };
+
+  function periodYearRange(dates){
+    const now = new Date();
+    let minY = now.getFullYear(), maxY = now.getFullYear();
+    dates.forEach(iso=>{
+      if(!iso) return;
+      const y = parseInt(iso.slice(0,4), 10);
+      if(!isNaN(y)){ if(y < minY) minY = y; if(y > maxY) maxY = y; }
+    });
+    const years = [];
+    for(let y=minY; y<=maxY; y++) years.push(y);
+    return years;
+  }
+
+  function populatePeriodSelect(monthSelId, yearSelId, filter, dateList){
+    const monthSel = document.getElementById(monthSelId);
+    const yearSel = document.getElementById(yearSelId);
+    if(!monthSel || !yearSel) return;
+    if(!monthSel.dataset.filled){
+      monthSel.innerHTML = '<option value="0">All months</option>' +
+        MONTH_NAMES.map((n,i)=>`<option value="${i+1}">${n}</option>`).join('');
+      monthSel.dataset.filled = '1';
+    }
+    monthSel.value = String(filter.month);
+
+    const years = periodYearRange(dateList);
+    const neededYearValues = ['0', ...years.map(String)];
+    const existingYearValues = [...yearSel.options].map(o=>o.value);
+    const sameSet = existingYearValues.length === neededYearValues.length && existingYearValues.every((v,i)=>v===neededYearValues[i]);
+    if(!sameSet){
+      yearSel.innerHTML = '<option value="0">All years</option>' + years.map(y=>`<option value="${y}">${y}</option>`).join('');
+    }
+    yearSel.value = String(filter.year);
+  }
+
+  function matchesPeriod(iso, filter){
+    if(!iso) return true; // undated rows always show, so freshly added rows don't disappear
+    if(!filter.month && !filter.year) return true;
+    const y = parseInt(iso.slice(0,4), 10);
+    const m = parseInt(iso.slice(5,7), 10);
+    if(filter.year && y !== filter.year) return false;
+    if(filter.month && m !== filter.month) return false;
+    return true;
+  }
+
+  function wirePeriodControls(monthSelId, yearSelId, resetBtnId, filter, rerender){
+    document.getElementById(monthSelId).addEventListener('change', e=>{ filter.month = parseInt(e.target.value, 10); rerender(); });
+    document.getElementById(yearSelId).addEventListener('change', e=>{ filter.year = parseInt(e.target.value, 10); rerender(); });
+    document.getElementById(resetBtnId).addEventListener('click', ()=>{
+      const t = new Date();
+      filter.month = t.getMonth()+1; filter.year = t.getFullYear();
+      rerender();
+    });
+  }
+  wirePeriodControls('measMonthSelect', 'measYearSelect', 'measPeriodReset', measPeriodFilter, renderMeasurements);
+  wirePeriodControls('anaMonthSelect', 'anaYearSelect', 'anaPeriodReset', anaPeriodFilter, renderAnalysis);
+  wirePeriodControls('mergedMonthSelect', 'mergedYearSelect', 'mergedPeriodReset', mergedPeriodFilter, renderMerged);
+
+  function renderMeasurements(){
+    const body = document.getElementById('measurementsBody');
+    body.innerHTML = '';
+    populatePeriodSelect('measMonthSelect', 'measYearSelect', measPeriodFilter, measurements.map(m=>m.date));
+    const visible = measurements.filter(m => matchesPeriod(m.date, measPeriodFilter));
+    document.getElementById('countMeasurements').textContent = visible.length;
+    document.getElementById('measurementsEmpty').style.display = visible.length ? 'none' : 'block';
+    visible.forEach(row => body.appendChild(buildMeasurementRow(row)));
+    const pc = document.getElementById('measPeriodCount');
+    if(pc) pc.textContent = `Showing ${visible.length} of ${measurements.length}`;
+    populateSearchDropdowns();
+    renderSearchMeasurements();
+  }
+
+  function addRows(collection, storeKey, factory, count, rerender){
+    for(let i=0;i<count;i++) collection.push(factory());
+    save(storeKey, collection);
+    rerender();
+    toast(count > 1 ? (count + ' rows added') : 'Row added');
+  }
+
+  document.querySelectorAll('[data-add]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const type = btn.dataset.add;
+      const count = parseInt(btn.dataset.count, 10) || 1;
+      if(type === 'measurements'){
+        const newRows = [];
+        for(let i=0;i<count;i++) newRows.push({ id: uid(), date:'', tech1:'', tech2:'', project:'', category:'', zone:'', location:'', technology:'', comments:'' });
+        measurements.push(...newRows);
+        newRows.forEach(m => analysis.push(createLinkedAnalysisRow(m)));
+        save(LS_KEYS.meas, measurements);
+        save(LS_KEYS.ana, analysis);
+        renderMeasurements(); renderAnalysis();
+        toast(count > 1 ? (count + ' rows added') : 'Row added');
+      } else if(type === 'analysis'){
+        addRows(analysis, LS_KEYS.ana, ()=>({ id: uid(), linkId:null, measDate:'', measTech1:'', measTech2:'', measProject:'', measCategory:'', measZone:'', measLocation:'', measTechnology:'', measComments:'', date:'', assignee:'', dateAssigned:'', dateDelivery:'', status:'notassigned' }), count, renderAnalysis);
+      }
+    });
+  });
+
+  /* ---------- Analysis table ---------- */
+  const STATUS_OPTIONS_RAW = ['notassigned','assigned','inprogress','delayed','done'];
+  const STATUS_LABELS = { notassigned:'Not Assigned', assigned:'Assigned', inprogress:'In progress', delayed:'Delayed', done:'Done' };
+
+  function isPastDate(iso){
+    if(!iso) return false;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const d = new Date(iso + 'T00:00:00');
+    return d.getTime() < today.getTime();
+  }
+  function isTodayDate(iso){
+    if(!iso) return false;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const d = new Date(iso + 'T00:00:00');
+    return d.getTime() === today.getTime();
+  }
+  // The stored status is never overwritten by this — it's only used for how a row
+  // displays/highlights right now, so it recalculates cleanly if the date or status changes later.
+  function effectiveAnalysisStatus(row){
+    if(row.status === 'done') return 'done';
+    if(row.status === 'notassigned' && row.manualReset) return 'notassigned'; // manually reset: no auto Delayed
+    if(isPastDate(row.date)) return 'delayed';
+    return row.status || 'notassigned';
+  }
+  function effectiveMeasurementStatus(row){
+    if(!row.date) return 'planned';
+    if(isPastDate(row.date)) return 'done';
+    if(isTodayDate(row.date)) return 'inprogress';
+    return 'planned';
+  }
+
+  function statusSelectEl(row, storeKey, dataset, rerender){
+    const effective = effectiveAnalysisStatus(row);
+    const wrap = document.createElement('div');
+    wrap.className = 'status-cell status-' + effective;
+    const signal = document.createElement('div');
+    signal.className = 'signal';
+    signal.innerHTML = '<i></i><i></i><i></i>';
+    const sel = document.createElement('select');
+    STATUS_OPTIONS_RAW.forEach(v=>{
+      const opt = document.createElement('option');
+      opt.value = v; opt.textContent = STATUS_LABELS[v];
+      if(effective === v) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.addEventListener('change', e=>{
+      row.status = e.target.value;
+      row.manualReset = (row.status === 'notassigned'); // manual "Not Assigned" overrides auto Delayed / time rules
+      save(storeKey, dataset);
+      rerender();
+    });
+    wrap.append(signal, sel);
+    return wrap;
+  }
+
+  function buildAnalysisRow(row){
+    const tr = document.createElement('tr');
+    { const eff = effectiveAnalysisStatus(row); if(eff === 'done' || eff === 'inprogress' || eff === 'delayed') tr.classList.add('row-' + eff); }
+    const isLinked = !!row.linkId;
+    const anaDateSync = () => {
+      renderAnalysis(); // date drives Delayed — always repaint row color; also refreshes Merged Plan
+    };
+
+    const tdSource = document.createElement('td');
+    const badge = document.createElement('span');
+    badge.className = 'source-badge ' + (isLinked ? 'source-linked' : 'source-manual');
+    badge.textContent = isLinked ? '🔗 Linked' : 'Manual';
+    badge.title = isLinked ? 'Auto-filled from the Measurement Plan' : 'Entered directly in this table';
+    tdSource.appendChild(badge);
+
+    const tdStatus = document.createElement('td');
+    tdStatus.appendChild(statusSelectEl(row, LS_KEYS.ana, analysis, renderAnalysis));
+
+    let measCells;
+    if(isLinked){
+      measCells = [
+        makeLockedDateCell(row.measDate),
+        makeLockedCell(row.measTech1),
+        makeLockedCell(row.measTech2),
+        makeLockedCell(row.measProject),
+        makeLockedCell(row.measCategory),
+        makeLockedCell(row.measZone, false, 'zone-field'),
+        makeLockedCell(row.measLocation),
+        makeLockedCell(row.measTechnology),
+        makeLockedCell(row.measComments, true)
+      ];
+    } else {
+      measCells = [
+        makeEditableDateCell(row, 'measDate', LS_KEYS.ana, analysis, anaDateSync),
+        makeSelectCell(row, 'measTech1', LS_KEYS.ana, analysis, measurementAssignees(), 'Select…'),
+        makeSelectCell(row, 'measTech2', LS_KEYS.ana, analysis, measurementAssignees(), 'Select…'),
+        makeTextCell(row, 'measProject', LS_KEYS.ana, analysis, 'Project', 'projectOptions'),
+        makeTextCell(row, 'measCategory', LS_KEYS.ana, analysis, 'Category', 'categoryOptions'),
+        makeTextCell(row, 'measZone', LS_KEYS.ana, analysis, 'e.g. Zone 4B', 'zoneOptions', undefined, 'zone-field'),
+        makeTextCell(row, 'measLocation', LS_KEYS.ana, analysis, 'Location'),
+        makeSelectCell(row, 'measTechnology', LS_KEYS.ana, analysis, TECHNOLOGY_OPTIONS, 'Select…'),
+        makeTextareaCell(row, 'measComments', LS_KEYS.ana, analysis)
+      ];
+    }
+
+    tr.append(
+      tdSource,
+      ...measCells,
+      makeEditableDateCell(row, 'date', LS_KEYS.ana, analysis, anaDateSync),
+      makeSelectCell(row, 'assignee', LS_KEYS.ana, analysis, engineers, 'Select…'),
+      makeEditableDateCell(row, 'dateDelivery', LS_KEYS.ana, analysis),
+      tdStatus,
+      makeAttachmentCell(row, LS_KEYS.ana, analysis, renderAnalysis),
+      makeDeleteCell(row, LS_KEYS.ana, analysis, renderAnalysis)
+    );
+    return tr;
+  }
+
+  function renderAnalysis(){
+    const body = document.getElementById('analysisBody');
+    body.innerHTML = '';
+    populatePeriodSelect('anaMonthSelect', 'anaYearSelect', anaPeriodFilter, analysis.map(a=>a.measDate));
+    const visible = analysis.filter(a => matchesPeriod(a.measDate, anaPeriodFilter));
+    document.getElementById('countAnalysis').textContent = visible.length;
+    document.getElementById('analysisEmpty').style.display = visible.length ? 'none' : 'block';
+    visible.forEach(row => body.appendChild(buildAnalysisRow(row)));
+    const pc = document.getElementById('anaPeriodCount');
+    if(pc) pc.textContent = `Showing ${visible.length} of ${analysis.length}`;
+    populateSearchDropdowns();
+    renderSearchAnalysis();
+    renderMerged();
+  }
+
+  /* ---------- Search pages ---------- */
+  const searchMeasFilters = { date:'', tech:'', zone:'', from:'', to:'' };
+  const searchAnaFilters = { measDate:'', tech:'', zone:'', analysisDate:'', delivered:'', from:'', to:'' };
+
+  function populateSearchDropdowns(){
+    const measSel = document.getElementById('sMeasTech');
+    const anaSel = document.getElementById('sAnaTech');
+    [measSel, anaSel].forEach(sel=>{
+      if(!sel) return;
+      const current = sel.value;
+      sel.innerHTML = '<option value="">Any technician</option>';
+      technicians.concat(engineers).forEach(n=>{
+        const opt = document.createElement('option');
+        opt.value = n; opt.textContent = n;
+        if(n === current) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    });
+  }
+
+  function matchesMeasSearch(row){
+    const f = searchMeasFilters;
+    if(f.date && row.date !== f.date) return false;
+    if(f.tech && row.tech1 !== f.tech && row.tech2 !== f.tech) return false;
+    if(f.zone && !(row.zone||'').toLowerCase().includes(f.zone.toLowerCase())) return false;
+    if(f.from && (!row.date || row.date < f.from)) return false;
+    if(f.to && (!row.date || row.date > f.to)) return false;
+    return true;
+  }
+  function matchesAnaSearch(row){
+    const f = searchAnaFilters;
+    if(f.measDate && row.measDate !== f.measDate) return false;
+    if(f.tech && row.measTech1 !== f.tech && row.measTech2 !== f.tech) return false;
+    if(f.zone && !(row.measZone||'').toLowerCase().includes(f.zone.toLowerCase())) return false;
+    if(f.analysisDate && row.date !== f.analysisDate) return false;
+    if(f.delivered && row.dateDelivery !== f.delivered) return false;
+    if(f.from && (!row.measDate || row.measDate < f.from)) return false;
+    if(f.to && (!row.measDate || row.measDate > f.to)) return false;
+    return true;
+  }
+
+  function renderSearchMeasurements(){
+    const body = document.getElementById('searchMeasBody');
+    if(!body) return;
+    const results = measurements.filter(matchesMeasSearch);
+    body.innerHTML = '';
+    results.forEach(row => body.appendChild(buildMeasurementRow(row)));
+    document.getElementById('searchMeasEmpty').style.display = results.length ? 'none' : 'block';
+  }
+  function renderSearchAnalysis(){
+    const body = document.getElementById('searchAnaBody');
+    if(!body) return;
+    const results = analysis.filter(matchesAnaSearch);
+    body.innerHTML = '';
+    results.forEach(row => body.appendChild(buildAnalysisRow(row)));
+    document.getElementById('searchAnaEmpty').style.display = results.length ? 'none' : 'block';
+  }
+
+  document.getElementById('sMeasDate').addEventListener('change', e=>{ searchMeasFilters.date = e.target.value; renderSearchMeasurements(); });
+  document.getElementById('sMeasTech').addEventListener('change', e=>{ searchMeasFilters.tech = e.target.value; renderSearchMeasurements(); });
+  document.getElementById('sMeasZone').addEventListener('input', e=>{ searchMeasFilters.zone = e.target.value; renderSearchMeasurements(); });
+  document.getElementById('sMeasFrom').addEventListener('change', e=>{ searchMeasFilters.from = e.target.value; renderSearchMeasurements(); });
+  document.getElementById('sMeasTo').addEventListener('change', e=>{ searchMeasFilters.to = e.target.value; renderSearchMeasurements(); });
+  document.getElementById('sMeasClear').addEventListener('click', ()=>{
+    searchMeasFilters.date = ''; searchMeasFilters.tech = ''; searchMeasFilters.zone = ''; searchMeasFilters.from = ''; searchMeasFilters.to = '';
+    document.getElementById('sMeasDate').value = '';
+    document.getElementById('sMeasTech').value = '';
+    document.getElementById('sMeasZone').value = '';
+    document.getElementById('sMeasFrom').value = '';
+    document.getElementById('sMeasTo').value = '';
+    renderSearchMeasurements();
+  });
+
+  document.getElementById('sAnaMeasDate').addEventListener('change', e=>{ searchAnaFilters.measDate = e.target.value; renderSearchAnalysis(); });
+  document.getElementById('sAnaTech').addEventListener('change', e=>{ searchAnaFilters.tech = e.target.value; renderSearchAnalysis(); });
+  document.getElementById('sAnaZone').addEventListener('input', e=>{ searchAnaFilters.zone = e.target.value; renderSearchAnalysis(); });
+  document.getElementById('sAnaDate').addEventListener('change', e=>{ searchAnaFilters.analysisDate = e.target.value; renderSearchAnalysis(); });
+  document.getElementById('sAnaDelivered').addEventListener('change', e=>{ searchAnaFilters.delivered = e.target.value; renderSearchAnalysis(); });
+  document.getElementById('sAnaFrom').addEventListener('change', e=>{ searchAnaFilters.from = e.target.value; renderSearchAnalysis(); });
+  document.getElementById('sAnaTo').addEventListener('change', e=>{ searchAnaFilters.to = e.target.value; renderSearchAnalysis(); });
+  document.getElementById('sAnaClear').addEventListener('click', ()=>{
+    searchAnaFilters.measDate = ''; searchAnaFilters.tech = ''; searchAnaFilters.zone = ''; searchAnaFilters.analysisDate = ''; searchAnaFilters.delivered = ''; searchAnaFilters.from = ''; searchAnaFilters.to = '';
+    document.getElementById('sAnaMeasDate').value = '';
+    document.getElementById('sAnaTech').value = '';
+    document.getElementById('sAnaZone').value = '';
+    document.getElementById('sAnaDate').value = '';
+    document.getElementById('sAnaDelivered').value = '';
+    document.getElementById('sAnaFrom').value = '';
+    document.getElementById('sAnaTo').value = '';
+    renderSearchAnalysis();
+  });
+
+  /* ---------- Merged table (derived, read-only — this is the home page) ---------- */
+  const MEASUREMENT_STATUS_LABELS = { planned:'Planned', inprogress:'In progress', done:'Done' };
+  const MEASUREMENT_STATUS_COLORS = { planned:'var(--muted)', inprogress:'var(--amber)', done:'var(--green)' };
+  const ANALYSIS_STATUS_COLORS = { notassigned:'var(--muted)', assigned:'var(--blue)', inprogress:'var(--amber)', delayed:'var(--red)', done:'var(--green)' };
+
+  const CHART_GROUPS = [
+    { title: 'Triple Play', match: cat => cat.indexOf('Triple Play Compounds') === 0 },
+    { title: 'ILCAMPO - New Cairo & El Sherouk', match: cat => cat === 'ILCAMPO - New Cairo & El Sherouk' },
+    { title: 'ILCAMPO - Zayed & October', match: cat => cat === 'ILCAMPO - Zayed & October' }
+  ];
+
+  function buildBarGroup(counts, order, labels, colors){
+    const max = Math.max(1, ...order.map(k => counts[k] || 0));
+    const wrap = document.createElement('div');
+    wrap.className = 'chart-bars';
+    order.forEach(key=>{
+      const count = counts[key] || 0;
+      const group = document.createElement('div');
+      group.className = 'chart-bar-group';
+      const bar = document.createElement('div');
+      bar.className = 'chart-bar';
+      bar.style.height = Math.max(3, Math.round((count / max) * 90)) + 'px';
+      bar.style.background = colors[key];
+      const val = document.createElement('span');
+      val.className = 'chart-value';
+      val.textContent = count;
+      bar.appendChild(val);
+      const label = document.createElement('div');
+      label.className = 'chart-bar-label';
+      label.textContent = labels[key];
+      group.append(bar, label);
+      wrap.appendChild(group);
+    });
+    return wrap;
+  }
+
+  function renderMergedCharts(){
+    const container = document.getElementById('mergedCharts');
+    if(!container) return;
+    container.innerHTML = '';
+
+    CHART_GROUPS.forEach(group=>{
+      const rows = analysis.filter(a => group.match(a.measCategory || ''));
+      const measCounts = { planned:0, inprogress:0, done:0 };
+      const anaCounts = { notassigned:0, assigned:0, inprogress:0, delayed:0, done:0 };
+      rows.forEach(a=>{
+        const ms = effectiveMeasurementStatus({ date: a.measDate });
+        measCounts[ms] = (measCounts[ms] || 0) + 1;
+        const as = mergedPhase(a).status;
+        anaCounts[as] = (anaCounts[as] || 0) + 1;
+      });
+
+      const card = document.createElement('div');
+      card.className = 'chart-card';
+      const h3 = document.createElement('h3');
+      h3.textContent = group.title;
+      const sub = document.createElement('div');
+      sub.className = 'chart-sub';
+      sub.textContent = rows.length + (rows.length === 1 ? ' compound' : ' compounds');
+      const measLabel = document.createElement('div');
+      measLabel.className = 'chart-section-label';
+      measLabel.textContent = 'Measurements';
+      const anaLabel = document.createElement('div');
+      anaLabel.className = 'chart-section-label';
+      anaLabel.textContent = 'Analysis';
+
+      card.append(
+        h3, sub,
+        measLabel,
+        buildBarGroup(measCounts, ['planned','inprogress','done'], MEASUREMENT_STATUS_LABELS, MEASUREMENT_STATUS_COLORS),
+        anaLabel,
+        buildBarGroup(anaCounts, ['notassigned','assigned','inprogress','delayed','done'], STATUS_LABELS, ANALYSIS_STATUS_COLORS)
+      );
+      container.appendChild(card);
+    });
+  }
+
+  /* Merged Plan time rules (based on Date of measurement, local time):
+     Done                          -> green
+     meas. day 10:00 - 19:00       -> dark-yellow flashing
+     meas. day 19:00 - 24:00       -> light yellow + "In progress"
+     after 00:00 next day, not done -> red + "Delayed"
+     otherwise                     -> normal status logic */
+  function mergedPhase(row, now){
+    now = now || new Date();
+    const base = effectiveAnalysisStatus(row);
+    if(row.status === 'done') return { status:'done', flash:false };
+    if(row.status === 'notassigned' && row.manualReset) return { status:'notassigned', flash:false };
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(row.measDate || '');
+    if(!m) return { status:base, flash:false };
+    const y=+m[1], mo=+m[2]-1, d=+m[3];
+    const t10 = new Date(y,mo,d,10,0,0), t19 = new Date(y,mo,d,19,0,0), tEnd = new Date(y,mo,d+1,0,0,0);
+    if(now >= tEnd) return { status:'delayed', flash:false };
+    if(now >= t19)  return { status:'inprogress', flash:false };
+    if(now >= t10)  return { status:base, flash:true };
+    return { status:base, flash:false };
+  }
+  function mergedSignature(){
+    const now = new Date();
+    return analysis.map(a => { const p = mergedPhase(a, now); return p.status + (p.flash ? '*' : ''); }).join('|');
+  }
+  let _mergedSig = '';
+  setInterval(()=>{
+    const sig = mergedSignature();
+    if(sig !== _mergedSig){ _mergedSig = sig; renderMerged(); }
+  }, 30000);
+
+  function renderMerged(){
+    const body = document.getElementById('mergedBody');
+    body.innerHTML = '';
+    populatePeriodSelect('mergedMonthSelect', 'mergedYearSelect', mergedPeriodFilter, analysis.map(a=>a.measDate));
+    // Sort by date of measurement so the overview reads chronologically
+    const rows = analysis.slice()
+      .filter(a => matchesPeriod(a.measDate, mergedPeriodFilter))
+      .sort((a,b) => (a.measDate||'').localeCompare(b.measDate||''));
+    document.getElementById('countMerged').textContent = rows.length;
+    document.getElementById('mergedEmpty').style.display = rows.length ? 'none' : 'block';
+    const mpc = document.getElementById('mergedPeriodCount');
+    if(mpc) mpc.textContent = `Showing ${rows.length} of ${analysis.length}`;
+
+    rows.forEach(row=>{
+      const tr = document.createElement('tr');
+      const ph = mergedPhase(row);
+      if(ph.flash) tr.classList.add('row-flash');
+      else if(ph.status === 'done' || ph.status === 'inprogress' || ph.status === 'delayed') tr.classList.add('row-' + ph.status);
+
+      const effStatus = ph.status;
+      const tdStatusBadge = document.createElement('td');
+      const statusPill = document.createElement('span');
+      statusPill.className = 'status-badge status-' + effStatus;
+      statusPill.textContent = STATUS_LABELS[effStatus] || effStatus || '';
+      tdStatusBadge.appendChild(statusPill);
+
+      tr.append(
+        makeLockedDateCell(row.measDate),
+        makeLockedCell(row.measProject),
+        makeLockedCell(row.measCategory),
+        makeLockedCell(row.measZone, false, 'zone-field'),
+        makeLockedCell(row.measLocation),
+        makeLockedCell(row.measTechnology),
+        makeLockedCell(row.measComments, true),
+        makeLockedDateCell(row.date),
+        makeLockedCell(row.assignee),
+        makeLockedDateCell(row.dateDelivery),
+        tdStatusBadge
+      );
+      body.appendChild(tr);
+    });
+    _mergedSig = mergedSignature();
+    renderMergedCharts();
+  }
+
+  /* ---------- Export / Import ---------- */
+  document.getElementById('exportBtn').addEventListener('click', ()=>{
+    const data = { technicians, engineers, measurements, analysis, merged, teamMembers, exportedAt: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'field-ops-tracker-backup.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Exported backup');
+  });
+
+  document.getElementById('importBtn').addEventListener('click', ()=>{
+    document.getElementById('importFile').click();
+  });
+  document.getElementById('importFile').addEventListener('change', e=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = evt=>{
+      try{
+        const data = JSON.parse(evt.target.result);
+        applyRemoteData(data);
+        scheduleDriveSync();
+        scheduleFirebaseSync();
+        toast('Data imported');
+      }catch(err){
+        toast('Import failed — invalid file');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  function applyRemoteData(data){
+    technicians = data.technicians || technicians;
+    engineers = data.engineers || engineers;
+    measurements = data.measurements || measurements;
+    analysis = data.analysis || analysis;
+    merged = data.merged || merged;
+    teamMembers = data.teamMembers || teamMembers;
+    analysis.forEach(a=>{
+      if(a.linkId === undefined) a.linkId = null;
+      if(a.measZone === undefined) a.measZone = a.zone || '';
+      if(a.measComments === undefined) a.measComments = a.comments || '';
+      if(a.measDate === undefined) a.measDate = '';
+      if(a.measTech1 === undefined) a.measTech1 = '';
+      if(a.measTech2 === undefined) a.measTech2 = '';
+      if(a.measLocation === undefined) a.measLocation = '';
+      if(a.measTechnology === undefined) a.measTechnology = '';
+      if(a.measProject === undefined) a.measProject = '';
+      if(a.measCategory === undefined) a.measCategory = '';
+      if(a.status === 'pending') a.status = 'notassigned'; // legacy status scheme
+    });
+    measurements.forEach(m=>{
+      if(m.location === undefined) m.location = '';
+      if(m.technology === undefined) m.technology = '';
+      if(m.project === undefined) m.project = '';
+      if(m.category === undefined) m.category = '';
+    });
+    reconcileLinks();
+    const categoriesFixed = reconcileMeasurementCategories();
+    localStorage.setItem(LS_KEYS.tech, JSON.stringify(technicians));
+    localStorage.setItem(LS_KEYS.eng, JSON.stringify(engineers));
+    localStorage.setItem(LS_KEYS.meas, JSON.stringify(measurements));
+    localStorage.setItem(LS_KEYS.ana, JSON.stringify(analysis));
+    localStorage.setItem(LS_KEYS.merged, JSON.stringify(merged));
+    localStorage.setItem(LS_KEYS.members, JSON.stringify(teamMembers));
+    renderRoster(); renderMeasurements(); renderAnalysis(); renderMerged();
+    if(categoriesFixed){ scheduleDriveSync(); scheduleFirebaseSync(); }
+  }
+
+  /* ================= Google Drive sync ================= */
+  const DRIVE_FILE_NAME = 'field-ops-tracker-data.json';
+  const gDrive = {
+    clientId: localStorage.getItem('fot_client_id') || '',
+    token: null,
+    fileId: localStorage.getItem('fot_drive_file_id') || null,
+    tokenClient: null,
+    connected: false,
+    syncTimer: null
+  };
+
+  document.getElementById('driveToggleBtn').addEventListener('click', ()=>{
+    document.getElementById('driveBar').classList.toggle('open');
+  });
+  document.getElementById('clientIdInput').value = gDrive.clientId;
+
+  function updateDriveUI(){
+    const dot = document.getElementById('driveDot');
+    const text = document.getElementById('driveStatusText');
+    const setupEl = document.getElementById('driveControlsSetup');
+    const connectedEl = document.getElementById('driveControlsConnected');
+    if(gDrive.connected){
+      dot.classList.add('connected');
+      text.textContent = 'Connected to Google Drive';
+      setupEl.style.display = 'none';
+      connectedEl.style.display = 'flex';
+    } else {
+      dot.classList.remove('connected');
+      text.textContent = 'Not connected — data saved to this browser only';
+      setupEl.style.display = 'flex';
+      connectedEl.style.display = 'none';
+    }
+  }
+  function setLastSync(date){
+    document.getElementById('lastSyncText').textContent = 'Last synced ' + date.toLocaleTimeString();
+  }
+  updateDriveUI();
+
+  async function driveRequest(url, options){
+    const res = await fetch(url, options || {});
+    if(!res.ok){
+      const text = await res.text();
+      throw new Error('Drive API ' + res.status + ': ' + text);
+    }
+    return res;
+  }
+
+  function currentDataObject(){
+    return { technicians, engineers, measurements, analysis, merged, teamMembers, updatedAt: new Date().toISOString() };
+  }
+
+  async function findDriveFile(){
+    const q = encodeURIComponent(`name='${DRIVE_FILE_NAME}' and trashed=false`);
+    const res = await driveRequest(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name)`, {
+      headers:{ Authorization: 'Bearer ' + gDrive.token }
+    });
+    const data = await res.json();
+    return (data.files && data.files[0]) ? data.files[0].id : null;
+  }
+
+  async function createDriveFile(){
+    const boundary = 'fot_boundary_' + Math.random().toString(36).slice(2);
+    const metadata = { name: DRIVE_FILE_NAME, mimeType: 'application/json' };
+    const content = JSON.stringify(currentDataObject());
+    const body =
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
+      `--${boundary}\r\nContent-Type: application/json\r\n\r\n${content}\r\n` +
+      `--${boundary}--`;
+    const res = await driveRequest('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+      method:'POST',
+      headers:{ Authorization: 'Bearer ' + gDrive.token, 'Content-Type': `multipart/related; boundary=${boundary}` },
+      body
+    });
+    const data = await res.json();
+    gDrive.fileId = data.id;
+    localStorage.setItem('fot_drive_file_id', data.id);
+    return data.id;
+  }
+
+  async function updateDriveFile(){
+    const content = JSON.stringify(currentDataObject());
+    await driveRequest(`https://www.googleapis.com/upload/drive/v3/files/${gDrive.fileId}?uploadType=media`, {
+      method:'PATCH',
+      headers:{ Authorization: 'Bearer ' + gDrive.token, 'Content-Type': 'application/json' },
+      body: content
+    });
+  }
+
+  async function loadDriveFile(){
+    const res = await driveRequest(`https://www.googleapis.com/drive/v3/files/${gDrive.fileId}?alt=media`, {
+      headers:{ Authorization: 'Bearer ' + gDrive.token }
+    });
+    return res.json();
+  }
+
+  async function pushToDrive(){
+    if(!gDrive.connected) return;
+    try{
+      if(gDrive.fileId){ await updateDriveFile(); }
+      else{ await createDriveFile(); }
+      setLastSync(new Date());
+    }catch(err){
+      console.error(err);
+      toast('Drive sync failed — see console');
+    }
+  }
+
+  function scheduleDriveSync(){
+    if(!gDrive.connected) return;
+    clearTimeout(gDrive.syncTimer);
+    gDrive.syncTimer = setTimeout(pushToDrive, 900);
+  }
+
+  async function syncAfterConnect(){
+    try{
+      if(!gDrive.fileId){
+        gDrive.fileId = await findDriveFile();
+        if(gDrive.fileId) localStorage.setItem('fot_drive_file_id', gDrive.fileId);
+      }
+      if(gDrive.fileId){
+        const remote = await loadDriveFile();
+        applyRemoteData(remote);
+        toast('Loaded latest data from Drive');
+      } else {
+        await createDriveFile();
+        toast('Created data file in your Drive');
+      }
+      setLastSync(new Date());
+    }catch(err){
+      console.error(err);
+      toast('Could not reach Drive — check Client ID / origin setup');
+    }
+  }
+
+  document.getElementById('connectDriveBtn').addEventListener('click', ()=>{
+    const val = document.getElementById('clientIdInput').value.trim();
+    if(!val){ toast('Paste your Client ID first'); return; }
+    gDrive.clientId = val;
+    localStorage.setItem('fot_client_id', val);
+    if(typeof google === 'undefined' || !google.accounts){
+      toast('Still loading Google sign-in — try again in a second');
+      return;
+    }
+    if(!gDrive.tokenClient){
+      gDrive.tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: gDrive.clientId,
+        scope: 'https://www.googleapis.com/auth/drive.file',
+        callback: async (resp)=>{
+          if(resp.error){ toast('Google sign-in failed'); return; }
+          gDrive.token = resp.access_token;
+          gDrive.connected = true;
+          updateDriveUI();
+          toast('Connected to Google Drive');
+          await syncAfterConnect();
+        }
+      });
+    }
+    gDrive.tokenClient.requestAccessToken({ prompt: 'consent' });
+  });
+
+  document.getElementById('syncNowBtn').addEventListener('click', ()=>{
+    toast('Syncing…');
+    pushToDrive();
+  });
+
+  document.getElementById('disconnectDriveBtn').addEventListener('click', ()=>{
+    if(gDrive.token && typeof google !== 'undefined' && google.accounts){
+      google.accounts.oauth2.revoke(gDrive.token, ()=>{});
+    }
+    gDrive.token = null;
+    gDrive.connected = false;
+    updateDriveUI();
+    toast('Disconnected (local data kept)');
+  });
+
+  /* ================= Firebase sync (multi-device / audit store) ================= */
+  const DEFAULT_FIREBASE_CONFIG = `{
+  "apiKey": "AIzaSyDRbPbonk7s_bahyS8fevFjuKa-b9A4a3g",
+  "authDomain": "orange-plans.firebaseapp.com",
+  "projectId": "orange-plans",
+  "storageBucket": "orange-plans.firebasestorage.app",
+  "messagingSenderId": "1073249468676",
+  "appId": "1:1073249468676:web:0e5d8c81590b8d45a0d051"
+}`;
+  const gFire = {
+    configRaw: localStorage.getItem('fot_firebase_config') || DEFAULT_FIREBASE_CONFIG,
+    app: null,
+    db: null,
+    docRef: null,
+    unsub: null,
+    connected: false,
+    applyingRemote: false,
+    syncTimer: null
+  };
+
+  document.getElementById('firebaseToggleBtn').addEventListener('click', ()=>{
+    document.getElementById('firebaseBar').classList.toggle('open');
+  });
+  document.getElementById('firebaseConfigInput').value = gFire.configRaw;
+
+  function updateFirebaseUI(){
+    const dot = document.getElementById('firebaseDot');
+    const text = document.getElementById('firebaseStatusText');
+    const setupEl = document.getElementById('firebaseControlsSetup');
+    const connectedEl = document.getElementById('firebaseControlsConnected');
+    if(gFire.connected){
+      dot.classList.add('connected');
+      text.textContent = 'Connected to Firebase — synced live across devices';
+      setupEl.style.display = 'none';
+      connectedEl.style.display = 'flex';
+    } else {
+      dot.classList.remove('connected');
+      text.textContent = 'Not connected — this is the recommended store for multi-device / audit use';
+      setupEl.style.display = 'flex';
+      connectedEl.style.display = 'none';
+    }
+  }
+  function setFirebaseLastSync(date){
+    document.getElementById('firebaseLastSyncText').textContent = 'Last synced ' + date.toLocaleTimeString();
+  }
+  updateFirebaseUI();
+
+  async function pushToFirebase(){
+    if(!gFire.connected || !gFire.docRef) return;
+    try{
+      const payload = currentDataObject();
+      gFire.applyingRemote = true; // our own write will re-trigger onSnapshot; ignore that echo
+      await gFire.docRef.set(payload, { merge: false });
+      await gFire.db.collection('auditLog').add({
+        timestamp: new Date().toISOString(),
+        measurementCount: measurements.length,
+        analysisCount: analysis.length,
+        mergedCount: merged.length
+      });
+      setFirebaseLastSync(new Date());
+    }catch(err){
+      console.error(err);
+      toast('Firebase sync failed: ' + (err && err.message ? err.message : 'see console'));
+    }finally{
+      setTimeout(()=>{ gFire.applyingRemote = false; }, 400);
+    }
+  }
+  function scheduleFirebaseSync(){
+    if(!gFire.connected) return;
+    clearTimeout(gFire.syncTimer);
+    gFire.syncTimer = setTimeout(pushToFirebase, 900);
+  }
+
+  function parseFirebaseConfig(raw){
+    let text = raw.trim();
+    // strip a leading "const firebaseConfig =" / "var x =" and a trailing semicolon, if pasted as a full snippet
+    text = text.replace(/^\s*(const|let|var)\s+\w+\s*=\s*/, '').replace(/;\s*$/, '');
+    try{ return JSON.parse(text); }catch(e){ /* fall through — likely unquoted keys */ }
+    try{ return (new Function('return (' + text + ')'))(); }catch(e){ return null; }
+  }
+
+  async function connectFirebase(raw, opts){
+    opts = opts || {};
+    if(!raw){ if(!opts.silent) toast('Paste your Firebase config first'); return false; }
+    const cfg = parseFirebaseConfig(raw);
+    if(!cfg || !cfg.projectId){ if(!opts.silent) toast('Could not read that config — paste the whole firebaseConfig block'); return false; }
+    if(typeof firebase === 'undefined'){ if(!opts.silent) toast('Still loading Firebase — try again in a second'); return false; }
+    try{
+      gFire.app = firebase.apps.length ? firebase.apps[0] : firebase.initializeApp(cfg);
+      gFire.db = firebase.firestore();
+      gFire.docRef = gFire.db.collection('fieldOpsTracker').doc('main');
+      localStorage.setItem('fot_firebase_config', raw);
+
+      const snap = await gFire.docRef.get();
+      if(snap.exists){
+        applyRemoteData(snap.data());
+        if(!opts.silent) toast('Loaded latest data from Firebase');
+      } else {
+        await gFire.docRef.set(currentDataObject());
+        if(!opts.silent) toast('Created Firebase document from current data');
+      }
+
+      gFire.connected = true;
+      updateFirebaseUI();
+      setFirebaseLastSync(new Date());
+
+      gFire.unsub = gFire.docRef.onSnapshot(docSnap=>{
+        if(gFire.applyingRemote || !docSnap.exists) return;
+        applyRemoteData(docSnap.data());
+        setFirebaseLastSync(new Date());
+      });
+      return true;
+    }catch(err){
+      console.error(err);
+      if(opts.silent){
+        toast('Firebase auto-connect failed: ' + (err && err.message ? err.message : 'see console'));
+      } else {
+        toast('Firebase connect failed: ' + (err && err.message ? err.message : 'see console'));
+      }
+      return false;
+    }
+  }
+
+  document.getElementById('connectFirebaseBtn').addEventListener('click', ()=>{
+    connectFirebase(document.getElementById('firebaseConfigInput').value.trim());
+  });
+
+  document.getElementById('firebaseSyncNowBtn').addEventListener('click', ()=>{
+    toast('Syncing…');
+    pushToFirebase();
+  });
+
+  document.getElementById('disconnectFirebaseBtn').addEventListener('click', ()=>{
+    if(gFire.unsub) gFire.unsub();
+    gFire.connected = false;
+    updateFirebaseUI();
+    toast('Disconnected from Firebase (local data kept)');
+  });
+
+  /* ---------- Extract to Excel ---------- */
+  document.getElementById('extractExcelBtn').addEventListener('click', ()=>{
+    if(typeof XLSX === 'undefined'){
+      toast('Still loading Excel exporter — try again in a second');
+      return;
+    }
+    const wb = XLSX.utils.book_new();
+
+    const measData = [
+      ['Date of measurement','Technician 1','Technician 2','Project','Category','Target zone','Location','Technology','Comments'],
+      ...measurements.map(m => [formatDateDMY(m.date), m.tech1||'', m.tech2||'', m.project||'', m.category||'', m.zone||'', m.location||'', m.technology||'', m.comments||''])
+    ];
+    const wsMeas = XLSX.utils.aoa_to_sheet(measData);
+    wsMeas['!cols'] = [{wch:16},{wch:16},{wch:16},{wch:14},{wch:40},{wch:16},{wch:18},{wch:16},{wch:34}];
+
+    const anaData = [
+      ['Source','Date of measurement','Technician 1','Technician 2','Project','Category','Target zone','Location','Technology','Comments','Date of analysis','Assignee','Report delivered','Status','Attachment'],
+      ...analysis.map(a => [
+        a.linkId ? 'Linked' : 'Manual',
+        formatDateDMY(a.measDate), a.measTech1||'', a.measTech2||'', a.measProject||'', a.measCategory||'', a.measZone||'', a.measLocation||'', a.measTechnology||'', a.measComments||'',
+        formatDateDMY(a.date), a.assignee||'', formatDateDMY(a.dateDelivery), STATUS_LABELS[a.status] || a.status || '',
+        a.attachment ? a.attachment.name : ''
+      ])
+    ];
+    const wsAna = XLSX.utils.aoa_to_sheet(anaData);
+    wsAna['!cols'] = [{wch:9},{wch:16},{wch:16},{wch:16},{wch:14},{wch:40},{wch:16},{wch:18},{wch:16},{wch:30},{wch:16},{wch:16},{wch:16},{wch:11},{wch:24}];
+
+    const mergedSorted = analysis.slice().sort((a,b) => (a.measDate||'').localeCompare(b.measDate||''));
+    const mergedData = [
+      ['Source','Date of measurement','Technician 1','Technician 2','Project','Category','Target zone','Location','Technology','Comments','Date of analysis','Assignee','Report delivered','Status','Attachment'],
+      ...mergedSorted.map(a => [
+        a.linkId ? 'Linked' : 'Manual',
+        formatDateDMY(a.measDate), a.measTech1||'', a.measTech2||'', a.measProject||'', a.measCategory||'', a.measZone||'', a.measLocation||'', a.measTechnology||'', a.measComments||'',
+        formatDateDMY(a.date), a.assignee||'', formatDateDMY(a.dateDelivery), STATUS_LABELS[a.status] || a.status || '',
+        a.attachment ? a.attachment.name : ''
+      ])
+    ];
+    const wsMerged = XLSX.utils.aoa_to_sheet(mergedData);
+    wsMerged['!cols'] = [{wch:9},{wch:16},{wch:16},{wch:16},{wch:14},{wch:40},{wch:16},{wch:18},{wch:16},{wch:30},{wch:16},{wch:16},{wch:16},{wch:11},{wch:24}];
+
+    XLSX.utils.book_append_sheet(wb, wsMerged, 'Merged Plan (home)');
+    XLSX.utils.book_append_sheet(wb, wsMeas, 'Measurement Plan');
+    XLSX.utils.book_append_sheet(wb, wsAna, 'Analysis Plan');
+
+    const stamp = new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb, `field-ops-tracker-${stamp}.xlsx`);
+    toast('Excel file downloaded');
+  });
+
+  /* ---------- Init ---------- */
+  (function populateStaticDatalists(){
+    const zoneDl = document.getElementById('zoneOptions');
+    const projectDl = document.getElementById('projectOptions');
+    PROJECT_OPTIONS.forEach(p=>{
+      const opt = document.createElement('option'); opt.value = p; projectDl.appendChild(opt);
+    });
+    const categoryDl = document.getElementById('categoryOptions');
+    CATEGORY_OPTIONS.forEach(c=>{
+      const opt = document.createElement('option'); opt.value = c; categoryDl.appendChild(opt);
+    });
+    COMPOUND_DISPLAY_NAMES.forEach(name=>{
+      const opt = document.createElement('option'); opt.value = name; zoneDl.appendChild(opt);
+    });
+  })();
+
+  reconcileLinks();
+  renderRoster();
+  renderMeasurements();
+  renderAnalysis();
+  renderMerged();
+
+  // Auto-connect to Firebase using the saved (or default) config — no manual click needed.
+  setTimeout(()=>{ connectFirebase(gFire.configRaw, { silent: true }); }, 300);
+})();
+</script>
+<script>
+if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost')){
+  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); });
+}
+</script>
+</body>
+</html>
